@@ -1,0 +1,219 @@
+@import "tailwindcss";
+
+/*
+ * CIS design tokens. The palette comes from the EDU mockup (School-Performance-Insights.html),
+ * lifted to a lighter, calmer surface: near-white canvas, white cards, hairline borders, soft shadows.
+ * Light-only by design, matching the product brand.
+ */
+:root {
+    color-scheme: light;
+
+    --bg: #f5f8fd;
+    --bg-2: #edf2fb;
+    --surface: #ffffff;
+    --surface-2: #f8fafe;
+    --ink: #14234a;
+    --ink-2: #4f6185;
+    --muted: #8e9cb8;
+    --line: rgba(20, 45, 110, 0.08);
+    --line-strong: rgba(20, 45, 110, 0.14);
+
+    --primary: #2f5bd8;
+    --primary-2: #3a8ee0;
+    --primary-soft: rgba(47, 91, 216, 0.08);
+    --primary-softer: rgba(47, 91, 216, 0.045);
+
+    --good: #1f9d68;
+    --warn: #e98a1c;
+    --bad: #e0474f;
+    --auth: #8b5cf0;
+    --good-ink: #157a50;
+    --warn-ink: #a95f0b;
+    --bad-ink: #b8323a;
+    --auth-ink: #6a3fd6;
+    --good-soft: rgba(31, 157, 104, 0.1);
+    --warn-soft: rgba(233, 138, 28, 0.12);
+    --bad-soft: rgba(224, 71, 79, 0.1);
+    --auth-soft: rgba(139, 92, 240, 0.1);
+
+    --c1: #3b72ec;
+    --c2: #1aaabb;
+    --c3: #8b67f0;
+    --c4: #de6aa6;
+    --c5: #f2a23a;
+    --c6: #5bbd8b;
+
+    --shadow-sm: 0 1px 2px rgba(20, 40, 90, 0.04);
+    --shadow-card: 0 1px 2px rgba(20, 40, 90, 0.04), 0 10px 30px -18px rgba(47, 91, 216, 0.22);
+    --shadow-pop: 0 18px 40px -16px rgba(20, 40, 90, 0.28), 0 2px 6px rgba(20, 40, 90, 0.06);
+}
+
+@theme inline {
+    --font-sans: var(--font-manrope), "Segoe UI", system-ui, sans-serif;
+    --font-display: var(--font-sora), "Segoe UI", system-ui, sans-serif;
+
+    --color-bg: var(--bg);
+    --color-bg-2: var(--bg-2);
+    --color-surface: var(--surface);
+    --color-surface-2: var(--surface-2);
+    --color-ink: var(--ink);
+    --color-ink-2: var(--ink-2);
+    --color-muted: var(--muted);
+    --color-line: var(--line);
+    --color-line-strong: var(--line-strong);
+    --color-primary: var(--primary);
+    --color-primary-2: var(--primary-2);
+    --color-primary-soft: var(--primary-soft);
+    --color-primary-softer: var(--primary-softer);
+    --color-good: var(--good);
+    --color-warn: var(--warn);
+    --color-bad: var(--bad);
+    --color-auth: var(--auth);
+    --color-good-ink: var(--good-ink);
+    --color-warn-ink: var(--warn-ink);
+    --color-bad-ink: var(--bad-ink);
+    --color-auth-ink: var(--auth-ink);
+    --color-good-soft: var(--good-soft);
+    --color-warn-soft: var(--warn-soft);
+    --color-bad-soft: var(--bad-soft);
+    --color-auth-soft: var(--auth-soft);
+    --color-c1: var(--c1);
+    --color-c2: var(--c2);
+    --color-c3: var(--c3);
+    --color-c4: var(--c4);
+    --color-c5: var(--c5);
+    --color-c6: var(--c6);
+
+    --shadow-card: var(--shadow-card);
+    --shadow-pop: var(--shadow-pop);
+    --shadow-xs: var(--shadow-sm);
+
+    --animate-rise: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    --animate-fade: fade 0.25s ease-out both;
+    --animate-shimmer: shimmer 1.4s linear infinite;
+
+    @keyframes rise {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+    @keyframes fade {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+    @keyframes shimmer {
+        from {
+            background-position: -400px 0;
+        }
+        to {
+            background-position: 400px 0;
+        }
+    }
+}
+
+@layer base {
+    html,
+    body {
+        background: var(--bg);
+        color: var(--ink);
+    }
+    body {
+        font-family: var(--font-sans);
+        font-size: 14px;
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+    }
+    /* soft aura behind the content, a lighter take on the mockup's radial wash */
+    body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background:
+            radial-gradient(900px 520px at 85% -10%, rgba(58, 142, 224, 0.1), transparent 60%),
+            radial-gradient(760px 480px at 10% 0%, rgba(47, 91, 216, 0.07), transparent 60%),
+            linear-gradient(180deg, #f7faff 0%, var(--bg) 40%, var(--bg) 100%);
+    }
+    h1,
+    h2,
+    h3 {
+        font-family: var(--font-display);
+        letter-spacing: -0.01em;
+    }
+    :focus-visible {
+        outline: 2px solid color-mix(in srgb, var(--primary) 55%, transparent);
+        outline-offset: 2px;
+    }
+    ::selection {
+        background: rgba(47, 91, 216, 0.16);
+    }
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(20, 45, 110, 0.18) transparent;
+    }
+}
+
+@layer utilities {
+    .tabular {
+        font-variant-numeric: tabular-nums;
+    }
+    .eyebrow {
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+    }
+    .brand-gradient {
+        background: linear-gradient(120deg, var(--primary), var(--primary-2));
+    }
+    .text-gradient {
+        background: linear-gradient(100deg, #1a3478 0%, var(--primary) 55%, var(--primary-2) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+    .hatch {
+        background: repeating-linear-gradient(135deg, #f1f4f9 0 4px, #f8fafc 4px 8px);
+    }
+    .skeleton {
+        background: linear-gradient(90deg, #eef2f8 0%, #f6f8fc 40%, #eef2f8 80%);
+        background-size: 800px 100%;
+        animation: var(--animate-shimmer);
+    }
+}
+
+/* Recharts polish */
+.recharts-cartesian-grid line {
+    stroke: var(--line);
+}
+.recharts-text {
+    fill: var(--muted);
+    font-size: 11px;
+}
+.recharts-surface:focus,
+.recharts-wrapper:focus,
+.recharts-sector:focus,
+.recharts-rectangle:focus {
+    outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
