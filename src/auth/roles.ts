@@ -16,7 +16,7 @@ export interface RoleDefinition {
 }
 
 export const PERMISSIONS: { code: Permission; label: string; description: string }[] = [
-    { code: "dashboards.view", label: "View dashboards", description: "Executive Overview and every live platform (EDU, HR)" },
+    { code: "dashboards.view", label: "View dashboards", description: "Executive Overview and every live platform (EDU, HR, Finance)" },
     { code: "admin.users.manage", label: "Manage users", description: "Invite, deactivate and change the role of CIS users" },
     { code: "admin.roles.view", label: "View roles & permissions", description: "Review what each role can access" },
 ]

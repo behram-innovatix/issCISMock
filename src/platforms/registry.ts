@@ -1,4 +1,5 @@
 import {
+    ArrowLeftRight,
     Award,
     CalendarCheck,
     CalendarClock,
@@ -9,9 +10,12 @@ import {
     LayoutDashboard,
     Link2,
     type LucideIcon,
+    PiggyBank,
+    Receipt,
     TrendingUp,
     UserPlus,
     Users,
+    Wallet,
 } from "lucide-react"
 
 export interface NavItem {
@@ -74,12 +78,19 @@ export const PLATFORMS: PlatformDefinition[] = [
     {
         code: "fin",
         name: "Finance",
-        description: "Fees, collections and budget performance",
+        description: "Fees, budget, payroll and cash flow",
         icon: Landmark,
         basePath: "/fin",
-        status: "coming-soon",
+        status: "live",
         accent: "var(--c3)",
-        nav: [],
+        nav: [
+            { href: "/fin", label: "Overview", icon: LayoutDashboard },
+            { href: "/fin/fees", label: "Fees & Collections", icon: Receipt },
+            { href: "/fin/budget", label: "Budget vs Actual", icon: PiggyBank },
+            { href: "/fin/payroll", label: "Payroll", icon: Wallet },
+            { href: "/fin/cash-flow", label: "Cash Flow", icon: ArrowLeftRight },
+            { href: "/fin/accounts", label: "Fee Accounts", icon: Users },
+        ],
     },
 ]
 
