@@ -4,7 +4,7 @@
  */
 export type UserRole = "executive" | "admin"
 
-export type Permission = "dashboards.view" | "admin.users.manage" | "admin.roles.view"
+export type Permission = "dashboards.view" | "admin.users.manage" | "admin.roles.view" | "admin.connections.manage"
 
 export interface RoleDefinition {
     code: UserRole
@@ -16,9 +16,14 @@ export interface RoleDefinition {
 }
 
 export const PERMISSIONS: { code: Permission; label: string; description: string }[] = [
-    { code: "dashboards.view", label: "View dashboards", description: "Executive Overview and every live platform (EDU, HR, Finance)" },
+    { code: "dashboards.view", label: "View dashboards", description: "Executive Overview and every live platform (EDU, ERP)" },
     { code: "admin.users.manage", label: "Manage users", description: "Invite, deactivate and change the role of CIS users" },
     { code: "admin.roles.view", label: "View roles & permissions", description: "Review what each role can access" },
+    {
+        code: "admin.connections.manage",
+        label: "Manage connections",
+        description: "Add, test and sync the data sources that feed every platform",
+    },
 ]
 
 export const ROLES: Record<UserRole, RoleDefinition> = {
@@ -42,9 +47,10 @@ export const ROLES: Record<UserRole, RoleDefinition> = {
         responsibilities: [
             "Invite, deactivate and re-assign CIS users",
             "Maintain roles and platform access",
+            "Connect and monitor the data sources behind the dashboards",
             "Full read access to every dashboard",
         ],
-        permissions: ["dashboards.view", "admin.users.manage", "admin.roles.view"],
+        permissions: ["dashboards.view", "admin.users.manage", "admin.roles.view", "admin.connections.manage"],
     },
 }
 

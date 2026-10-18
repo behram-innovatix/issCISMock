@@ -1,5 +1,5 @@
 import { dateOf, NW, WEEKS } from "@/lib/calendar"
-import { AS_OF } from "@/lib/data-source"
+import { AS_OF } from "@/lib/calendar"
 import { avg, ratio, sum } from "@/lib/format"
 import { type Stage, STAGES, YGS, ygName } from "@/platforms/edu/data/constants"
 import { DEPARTMENTS, LOCATIONS } from "@/platforms/hr/data/constants"

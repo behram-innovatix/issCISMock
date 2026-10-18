@@ -30,7 +30,7 @@ const tenure = (d: Date) => {
     return months < 12 ? `${Math.max(months, 1)} mo` : `${(months / 12).toFixed(1)} yrs`
 }
 
-export function StaffProfileScreen({ id }: { id: number }) {
+export function StaffProfileScreen({ id }: { id: string }) {
     const router = useRouter()
     const { data } = useHrData()
     const { data: edu } = useEduData()
@@ -309,7 +309,7 @@ export function StaffProfileScreen({ id }: { id: number }) {
                     <Panel
                         span={reports.length ? 8 : 12}
                         title="Classes taught"
-                        subtitle={`Linked from Issphere EDU · ${recorded.length} behaviour records logged by ${e.name.split(" ")[0]} ${e.name.split(" ").slice(-1)}`}
+                        subtitle={`Linked from EDU · ${recorded.length} behaviour records logged by ${e.name.split(" ")[0]} ${e.name.split(" ").slice(-1)}`}
                     >
                         {sections.length === 0 ? (
                             <Empty>No classes on the timetable.</Empty>

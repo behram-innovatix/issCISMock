@@ -1,7 +1,9 @@
 "use client"
 
-import { AS_OF, DATA_SOURCE } from "@/lib/data-source"
-import { platformForPath } from "@/platforms/registry"
+import { AS_OF } from "@/lib/calendar"
+import type { InsightsMeta } from "@/lib/insights"
+import { platformForPath, suiteOf } from "@/platforms/registry"
+import { skipToken, useQuery } from "@tanstack/react-query"
 import { ChevronRight, Menu } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -11,15 +13,29 @@ export function Topbar() {
     const path = usePathname()
     const setMobileOpen = useShell((s) => s.setMobileOpen)
     const platform = platformForPath(path)
+    // freshness of the dataset the page shows (the Executive Overview leads with EDU); read from the
+    // query cache only, never fetched here
+    const code = platform?.code ?? (path === "/" ? "edu" : null)
+    const { data } = useQuery<{ meta: InsightsMeta }>({ queryKey: [code ?? "none", "dataset"], queryFn: skipToken })
+    const meta = code ? data?.meta : undefined
     const page =
         platform?.nav.find((n) => n.href === path) ??
         platform?.nav.filter((n) => n.href !== platform.basePath).find((n) => path.startsWith(n.href + "/"))
     const detail = page && path !== page.href
 
     const crumbs: { label: string; href?: string }[] = [{ label: "CIS", href: "/" }]
-    if (path.startsWith("/admin")) crumbs.push({ label: "Administration" }, { label: "Users & Roles" })
+    if (path.startsWith("/admin/connections")) {
+        crumbs.push(
+            { label: "Administration" },
+            { label: "Connections", href: path === "/admin/connections" ? undefined : "/admin/connections" },
+        )
+        if (path === "/admin/connections/new") crumbs.push({ label: "Add connection" })
+        else if (path !== "/admin/connections") crumbs.push({ label: "Data source" })
+    } else if (path.startsWith("/admin")) crumbs.push({ label: "Administration" }, { label: "Users & Roles" })
     else if (!platform) crumbs.push({ label: "Executive Overview" })
     else {
+        const suite = suiteOf(platform)
+        if (suite && suite.platforms.length > 1) crumbs.push({ label: suite.name })
         crumbs.push({ label: platform.name, href: platform.basePath })
         if (page) crumbs.push({ label: page.label, href: detail ? page.href : undefined })
         if (detail) crumbs.push({ label: "Profile" })
@@ -50,20 +66,50 @@ export function Topbar() {
                         </span>
                     ))}
                 </nav>
-                {DATA_SOURCE === "mock" && (
-                    <span className="border-line-strong text-muted hidden rounded-full border border-dashed px-2.5 py-1 text-[11px] font-semibold sm:inline">
-                        Mock data
-                    </span>
-                )}
-                <span className="border-line bg-surface text-ink-2 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11.5px] font-semibold shadow-xs">
-                    <i className="relative flex size-2">
-                        <i className="bg-good absolute inset-0 animate-ping rounded-full opacity-40" />
-                        <i className="bg-good relative size-2 rounded-full" />
-                    </i>
-                    <span className="hidden sm:inline">As of</span>{" "}
-                    {AS_OF.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                </span>
+                {meta && <Freshness meta={meta} />}
             </div>
         </header>
+    )
+}
+
+const fmtDate = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+
+/** How current the platform's data is, from its sources' last syncs. */
+function Freshness({ meta }: { meta: InsightsMeta }) {
+    const failing = meta.sources.some((s) => s.is_active && s.status === "failing")
+    const degraded = meta.sources.some((s) => s.is_active && s.status === "degraded")
+    const tone = !meta.connected ? "muted" : failing ? "bad" : degraded ? "warn" : "good"
+    const synced = meta.synced_at ? new Date(meta.synced_at) : null
+    const title = [
+        meta.platform === "edu" && meta.connected ? `Attendance to ${fmtDate(AS_OF)}` : null,
+        synced
+            ? `Last synced ${synced.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+            : "Never synced",
+        failing ? "A source is failing" : degraded ? "A sync was blocked by data checks" : null,
+    ]
+        .filter(Boolean)
+        .join(" · ")
+
+    return (
+        <span
+            title={title}
+            className="border-line bg-surface text-ink-2 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11.5px] font-semibold shadow-xs"
+        >
+            <i className="relative flex size-2">
+                {tone === "good" && <i className="bg-good absolute inset-0 animate-ping rounded-full opacity-40" />}
+                <i className="relative size-2 rounded-full" style={{ background: `var(--${tone})` }} />
+            </i>
+            {!meta.connected ? (
+                "Not connected"
+            ) : meta.platform === "edu" ? (
+                <>
+                    <span className="hidden sm:inline">As of</span> {fmtDate(AS_OF)}
+                </>
+            ) : (
+                <>
+                    <span className="hidden sm:inline">Synced</span> {synced ? fmtDate(synced) : "never"}
+                </>
+            )}
+        </span>
     )
 }

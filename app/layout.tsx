@@ -9,7 +9,7 @@ const manrope = Manrope({ subsets: ["latin"], weight: ["400", "500", "600", "700
 
 export const metadata: Metadata = {
     title: { default: "ISS CIS · Central Intelligence System", template: "%s · ISS CIS" },
-    description: "Executive insight across Issphere EDU, HR and future platforms.",
+    description: "Executive insight across EDU, ERP (HR and Finance) and future platforms.",
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {

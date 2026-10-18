@@ -59,11 +59,7 @@ export function AdminScreen({ currentUserId }: { currentUserId: string }) {
                     </>
                 }
             />
-            {tab === "users" ? (
-                <UsersTab users={users} currentUserId={currentUserId} onUpdate={update} />
-            ) : (
-                <RolesTab users={users} />
-            )}
+            {tab === "users" ? <UsersTab users={users} currentUserId={currentUserId} onUpdate={update} /> : <RolesTab users={users} />}
             {inviting && (
                 <InviteDialog
                     existing={users}
@@ -96,7 +92,12 @@ function UsersTab({
     return (
         <div className="space-y-4">
             <KpiGrid>
-                <Kpi label="Total users" value={users.length} icon={<Users />} foot={`${count((u) => u.status === "invited")} pending invites`} />
+                <Kpi
+                    label="Total users"
+                    value={users.length}
+                    icon={<Users />}
+                    foot={`${count((u) => u.status === "invited")} pending invites`}
+                />
                 <Kpi
                     label="Active"
                     value={count((u) => u.status === "active")}
@@ -104,8 +105,20 @@ function UsersTab({
                     color="var(--good)"
                     foot={`${count((u) => u.status === "disabled")} deactivated`}
                 />
-                <Kpi label="Executives" value={count((u) => u.role === "executive")} icon={<Gauge />} color="var(--c2)" foot="Dashboard access" />
-                <Kpi label="Administrators" value={count((u) => u.role === "admin")} icon={<ShieldCheck />} color="var(--c3)" foot="Full system access" />
+                <Kpi
+                    label="Executives"
+                    value={count((u) => u.role === "executive")}
+                    icon={<Gauge />}
+                    color="var(--c2)"
+                    foot="Dashboard access"
+                />
+                <Kpi
+                    label="Administrators"
+                    value={count((u) => u.role === "admin")}
+                    icon={<ShieldCheck />}
+                    color="var(--c3)"
+                    foot="Full system access"
+                />
             </KpiGrid>
 
             <Panel
@@ -172,7 +185,11 @@ function UsersTab({
                                                 {self ? (
                                                     <span className="text-muted text-[11.5px]">—</span>
                                                 ) : u.status === "disabled" ? (
-                                                    <Button size="sm" variant="soft" onClick={() => onUpdate(u.id, { status: u.lastActive ? "active" : "invited" })}>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="soft"
+                                                        onClick={() => onUpdate(u.id, { status: u.lastActive ? "active" : "invited" })}
+                                                    >
                                                         Reactivate
                                                     </Button>
                                                 ) : (
@@ -285,11 +302,22 @@ function InviteDialog({ existing, onClose, onInvite }: { existing: CisUser[]; on
         const mail = email.trim().toLowerCase()
         if (!name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return setError("Enter a name and a valid email address.")
         if (existing.some((u) => u.email === mail)) return setError("A user with this email already exists.")
-        onInvite({ id: `u-${Date.now()}`, name: name.trim(), email: mail, title: title.trim() || ROLES[role].label, role, status: "invited", lastActive: null })
+        onInvite({
+            id: `u-${Date.now()}`,
+            name: name.trim(),
+            email: mail,
+            title: title.trim() || ROLES[role].label,
+            role,
+            status: "invited",
+            lastActive: null,
+        })
     }
 
     return (
-        <div className="animate-fade bg-ink/25 fixed inset-0 z-[60] flex items-center justify-center p-4 backdrop-blur-[2px]" onClick={onClose}>
+        <div
+            className="animate-fade bg-ink/25 fixed inset-0 z-[60] flex items-center justify-center p-4 backdrop-blur-[2px]"
+            onClick={onClose}
+        >
             <form
                 onSubmit={submit}
                 onClick={(e) => e.stopPropagation()}
@@ -305,7 +333,12 @@ function InviteDialog({ existing, onClose, onInvite }: { existing: CisUser[]; on
                         </h2>
                         <p className="text-muted mt-0.5 text-[12.5px]">They’ll receive an email to set up their CIS access.</p>
                     </div>
-                    <button type="button" onClick={onClose} className="text-muted hover:bg-bg-2 hover:text-ink rounded-lg p-1.5" aria-label="Close">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="text-muted hover:bg-bg-2 hover:text-ink rounded-lg p-1.5"
+                        aria-label="Close"
+                    >
                         <X className="size-4" />
                     </button>
                 </div>

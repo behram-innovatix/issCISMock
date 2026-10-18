@@ -1,15 +1,18 @@
 # ISS CIS: Central Intelligence System
 
-An executive dashboard that brings performance data from every Issphere platform into one place. It is built for the CEO first and can be opened to other leaders later. Today it covers **Issphere EDU** (students), **HR** (staff) and **Finance** (fees, budget, payroll and cash flow, in QAR). New platforms plug in through a registry.
+An executive dashboard that brings performance data from every Issphere platform into one place. It is built for the CEO first and can be opened to other leaders later. It covers **EDU** (students) and **ERP**: **HR** (staff) and **Finance** (fees, budget, payroll and cash flow, in QAR). New platforms plug in through a registry.
 
-Everything currently runs on **seeded mock data**, so the app works with no backend. The EDU numbers match the approved HTML mockup (`School-Performance-Insights.html`) exactly, because it uses the same seed and the same formulas.
+All data comes from the **CIS API** ([`Herd/issCisApi`](../../../Herd/issCisApi), Laravel + MySQL). It pulls each connected source (issEduApi's database, ISS export APIs, REST APIs, spreadsheets, pushed records) into its own store on a schedule and serves the dashboards from there. Administrators manage those sources under **Administration → Connections**. A platform without synced data shows a "not connected" state instead of its dashboards.
 
 ## Run it
 
 ```bash
 npm install
-npm run dev        # http://localhost:3010
+cp .env.example .env.local   # then set CIS_API_TOKEN (php artisan cis:token in issCisApi)
+npm run dev                  # http://localhost:3010
 ```
+
+The CIS API must be running (Herd serves it at http://isscisapi.test) with a queue worker for syncs: `php artisan queue:work` and `php artisan schedule:work` in issCisApi.
 
 | Script              | What it does                         |
 | ------------------- | ------------------------------------ |
@@ -25,10 +28,12 @@ The stack matches ISSPHERE-UI: Next.js 16 (App Router), React 19, Tailwind v4, r
 
 | Area | Route | Highlights |
 | --- | --- | --- |
-| **Executive Overview** | `/` | Headline KPIs from every live platform; student vs staff attendance; student, staff and fee-account alerts; school-by-school comparison incl. fee collection and budget variance |
+| **Executive Overview** | `/` | Headline KPIs from every connected platform; student vs staff attendance; student, staff and fee-account alerts; school-by-school comparison incl. fee collection and budget variance |
 | EDU Overview | `/edu` | Students, capacity, attendance, lateness, persistent absence, net behaviour |
 | EDU Enrollment | `/edu/enrollment` | Year-group bars (click to drill down), gender, section capacity grid, nationality |
 | EDU Attendance | `/edu/attendance` | Session mix, year groups, attendance bands, day-of-week heatmap, AM vs PM, mark codes |
+| EDU Aspect Analysis | `/edu/aspects` | Assessment results by aspect (waits for an assessment stream to be connected) |
+| EDU Aspect Analysis | `/edu/aspects` | Assessment results by aspect (waits for an assessment stream to be connected) |
 | EDU Behaviour | `/edu/behaviour` | Attendance × behaviour matrix (click a box to list the students), leaderboards, behaviour types |
 | EDU Students | `/edu/students`, `/edu/students/[id]` | Sortable register; profile with an AM/PM calendar, comparison with the class, and a behaviour log linked to staff |
 | HR Overview | `/hr` | Staff attendance, absence, leave, average appraisal, cycle progress, by location and department |
@@ -42,6 +47,8 @@ The stack matches ISSPHERE-UI: Next.js 16 (App Router), React 19, Tailwind v4, r
 | Finance Payroll | `/fin/payroll` | Monthly payroll by component, new joiners (linked to HR), cost by department, grade and location, cost per student |
 | Finance Cash Flow | `/fin/cash-flow` | Inflow vs outflow, cash position, income by stream, expenditure by category, days of cash on hand |
 | Finance Fee Accounts | `/fin/accounts`, `/fin/accounts/[id]` | Register by status; statement with invoices, instalments, payments and a link to the EDU student |
+| Connections | `/admin/connections` | Administrators: the data sources behind every dashboard — add (catalog of connector types), test, sync, history, files, push endpoint |
+| Connections | `/admin/connections` | Administrators: the data sources behind every dashboard — add (catalog of connector types), test, sync, history, files, push endpoint |
 
 Filters (school, stage, year group, section, gender, period on EDU; location, department, role, period on HR; location, stage, period on Finance) apply to every screen in that platform.
 
@@ -49,32 +56,33 @@ Filters (school, stage, year group, section, gender, period on EDU; location, de
 
 ```
 app/(pages)/…                  thin route files → render a screen
-src/platforms/registry.ts      every connected platform (drives sidebar, breadcrumbs, executive view)
+app/api/insights/[platform]    server proxy: dashboard datasets from the CIS API (the API token stays on the server)
+app/api/admin/connections/…    server proxy: connection management for administrators
+src/platforms/registry.ts      every platform and how the sidebar groups them (EDU, ERP)
 src/platforms/<code>/
-  data/source.ts               DataSource interface + mock/api switch  ← the integration contract
-  data/mock.ts | api.ts        seeded mock (today) | ISSPHERE endpoint client (to build)
-  data/generate.ts             mock generator
+  data/source.ts               loads the platform's dataset from the CIS API  ← the integration contract
+  data/constants.ts            CIS vocabularies; reference data (schools, mark codes…) arrives with the dataset
   analytics.ts                 pure roll-ups the screens render (unit-testable, server-portable)
   state.ts, hooks.ts           zustand filters, TanStack Query hooks
   components/, features/*/screen.tsx
-src/mock/world.ts              builds EDU first, then HR around its sections (teacher ↔ class links), then Finance (own seed)
+src/lib/calendar.ts            the reporting calendar, applied from the dataset (live bindings)
+src/features/connections/      the Connections admin screens (forms generated from each connector's fields)
 src/components/{shell,ui,charts,insights}   shared layout, primitives, chart presets, KPI/matrix/calendar/table
 ```
 
-### Switching to real data
+### Where the data comes from
 
-Set `NEXT_PUBLIC_DATA_SOURCE=api` and implement `src/platforms/<code>/data/api.ts`, using `@workspace/core-client` once this app moves into the monorepo. The screens don't change.
-
-The quickest path is for `api.ts` to return the same `EduDataset` / `HrDataset` / `FinDataset` shapes. For production volumes, move the functions in `analytics.ts` behind `/api/v1/edu/insights/*`, `/api/v1/hrm/insights/*` and `/api/v1/finance/insights/*` endpoints instead. They are pure functions, so they port directly.
+Each `data/source.ts` fetches `/api/insights/<platform>`, which the CIS API builds from the synced marts of that platform's data sources. The EDU dataset brings its own reporting calendar (the school weeks up to the latest attendance mark) and reference data (schools, register mark codes and how they count, behaviour types, staff). HR and Finance report "not connected" until their sources (the seeded HRM and Finance API connections) are set up and their dataset builders exist in the CIS API.
 
 ### Adding a platform
 
 Finance was added this way; use `src/platforms/fin/` as the template.
 
-1. Create `src/platforms/<code>/` with `data/` (source, mock, api), `analytics.ts`, `state.ts`, `hooks.ts` and its screens.
-2. Add routes under `app/(pages)/<code>/…`.
-3. In `src/platforms/registry.ts`, set `status: "live"` and fill in `nav`.
-4. Add its headline metrics to `HEADLINES` in `src/features/executive/screen.tsx`.
+1. In the CIS API, add the platform's streams to `config/cis_streams.php` and a dataset builder for `/api/v1/insights/<code>`.
+2. Create `src/platforms/<code>/` with `data/` (source, types, constants), `analytics.ts`, `state.ts`, `hooks.ts` and its screens.
+3. Add routes under `app/(pages)/<code>/…`.
+4. In `src/platforms/registry.ts`, set `status: "live"`, fill in `nav`, and add it to a suite in `SUITES`.
+5. Add its headline metrics to `HEADLINES` in `src/features/executive/screen.tsx`.
 
 ### Moving into ISSPHERE-UI
 

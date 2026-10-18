@@ -1,8 +1,8 @@
 "use client"
 
 import { PageHeader } from "@/components/shell/page-header"
+import { NotConnected } from "@/components/insights/not-connected"
 import { ScreenSkeleton } from "@/components/ui/skeleton"
-import { TERM_LABEL } from "@/lib/calendar"
 import type { EduDataset } from "@/platforms/edu/data/types"
 import type { ReactNode } from "react"
 import type { HrAnalysis, HrFilters } from "../analytics"
@@ -22,9 +22,11 @@ export function HrPage({ title, description, children }: { title: string; descri
     const { data, edu, analysis, filters, error } = useHrAnalysis()
     return (
         <>
-            <PageHeader eyebrow={`HR · ${TERM_LABEL}`} title={title} description={description} />
+            <PageHeader eyebrow="ERP · HR" title={title} description={description} />
             {error ? (
                 <div className="border-bad/20 bg-bad-soft text-bad-ink rounded-2xl border p-5 text-[13px]">{String(error)}</div>
+            ) : data && !data.meta.connected ? (
+                <NotConnected name="HR" meta={data.meta} />
             ) : !data || !edu || !analysis ? (
                 <ScreenSkeleton />
             ) : (

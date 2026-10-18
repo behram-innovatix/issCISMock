@@ -5,7 +5,7 @@ import Link from "next/link"
 import type { ReactNode } from "react"
 
 export interface LeaderItem {
-    id: number
+    id: string
     name: string
     meta: string
     value: ReactNode

@@ -1,16 +1,48 @@
-// Term 1 2026–27: school week Sun–Thu, term starts Sun 23 Aug 2026, data to Thu 8 Oct 2026.
-export const TERM_LABEL = "Term 1 · 2026–27"
-export const WEEKS = ["23 Aug", "30 Aug", "6 Sep", "13 Sep", "20 Sep", "27 Sep", "4 Oct"] as const
+// The reporting calendar: whole school weeks (Sunday to Thursday) up to the latest attendance mark.
+// It comes from the CIS API with the EDU dataset and is applied with applyCalendar() before any
+// screen renders; the exports are live bindings, so every importer sees the applied values.
+
+export interface CalendarInput {
+    /** first Sunday of the window, YYYY-MM-DD */
+    start: string
+    /** date of the latest mark, YYYY-MM-DD */
+    as_of: string
+    weeks: number
+    label: string
+}
+
 export const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu"] as const
-export const NW = WEEKS.length
-export const dateOf = (w: number, d: number) => new Date(2026, 7, 23 + w * 7 + d)
+
+export let TERM_LABEL = ""
+export let WEEKS: string[] = []
+export let NW = 0
+/** Data is current to this date. */
+export let AS_OF = new Date()
+
+let start = new Date()
+
+const parseDate = (ymd: string) => {
+    const [y, m, d] = ymd.split("-").map(Number)
+    return new Date(y, m - 1, d)
+}
+
+export const dateOf = (w: number, d: number) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + w * 7 + d)
 
 /** Period filter: first week index included. */
-export type PeriodKey = 0 | 3 | 5
-export const PERIODS: { value: PeriodKey; label: string; long: string }[] = [
-    { value: 0, label: "Term to date", long: "Term to date (7 weeks)" },
-    { value: 3, label: "Last 4 weeks", long: "Last 4 weeks" },
-    { value: 5, label: "Last 2 weeks", long: "Last 2 weeks" },
-]
-export const periodLong = (w0: PeriodKey) => PERIODS.find((p) => p.value === w0)!.long
-export const weekRange = (w0: number) => Array.from({ length: NW - w0 }, (_, i) => w0 + i)
+export type PeriodKey = number
+export let PERIODS: { value: PeriodKey; label: string; long: string }[] = [{ value: 0, label: "All weeks", long: "All weeks" }]
+
+export function applyCalendar(c: CalendarInput) {
+    start = parseDate(c.start)
+    AS_OF = parseDate(c.as_of)
+    NW = c.weeks
+    TERM_LABEL = c.label
+    WEEKS = Array.from({ length: NW }, (_, w) => dateOf(w, 0).toLocaleDateString("en-GB", { day: "numeric", month: "short" }))
+    PERIODS = [
+        { value: 0, label: `All ${NW} weeks`, long: `${c.label} (${NW} weeks)` },
+        ...[4, 2].filter((n) => n < NW).map((n) => ({ value: NW - n, label: `Last ${n} weeks`, long: `Last ${n} weeks` })),
+    ]
+}
+
+export const periodLong = (w0: PeriodKey) => PERIODS.find((p) => p.value === w0)?.long ?? PERIODS[0].long
+export const weekRange = (w0: number) => Array.from({ length: Math.max(NW - w0, 0) }, (_, i) => w0 + i)

@@ -4,8 +4,8 @@ import { logout } from "@/auth/actions"
 import { ROLES, can, type SessionUser } from "@/auth/roles"
 import { cn } from "@/lib/cn"
 import { initials } from "@/lib/format"
-import { PLATFORMS, platformForPath, type PlatformDefinition } from "@/platforms/registry"
-import { ChevronDown, Gauge, LogOut, PanelLeftClose, PanelLeft, ShieldCheck, X } from "lucide-react"
+import { platformForPath, platformsOf, SUITES, type PlatformDefinition, type SuiteDefinition } from "@/platforms/registry"
+import { Cable, ChevronDown, Gauge, LogOut, PanelLeftClose, PanelLeft, ShieldCheck, X } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
@@ -70,13 +70,18 @@ export function Sidebar({ user }: { user: SessionUser }) {
                         <NavLink href="/" label="Executive Overview" icon={<Gauge />} exact collapsed={collapsed} />
                     </NavSection>
                     <NavSection title="Platforms" collapsed={collapsed}>
-                        {PLATFORMS.map((p) => (
-                            <PlatformGroup key={p.code} p={p} collapsed={collapsed} />
+                        {SUITES.map((s) => (
+                            <SuiteGroup key={s.code} suite={s} collapsed={collapsed} />
                         ))}
                     </NavSection>
-                    {can(user.role, "admin.users.manage") && (
+                    {(can(user.role, "admin.users.manage") || can(user.role, "admin.connections.manage")) && (
                         <NavSection title="Administration" collapsed={collapsed}>
-                            <NavLink href="/admin" label="Users & Roles" icon={<ShieldCheck />} collapsed={collapsed} />
+                            {can(user.role, "admin.users.manage") && (
+                                <NavLink href="/admin" label="Users & Roles" icon={<ShieldCheck />} exact collapsed={collapsed} />
+                            )}
+                            {can(user.role, "admin.connections.manage") && (
+                                <NavLink href="/admin/connections" label="Connections" icon={<Cable />} collapsed={collapsed} />
+                            )}
                         </NavSection>
                     )}
                 </nav>
@@ -171,28 +176,30 @@ function NavLink({
     )
 }
 
-function PlatformGroup({ p, collapsed }: { p: PlatformDefinition; collapsed: boolean }) {
+function SuiteGroup({ suite, collapsed }: { suite: SuiteDefinition; collapsed: boolean }) {
     const path = usePathname()
-    const active = platformForPath(path)?.code === p.code
+    const platforms = platformsOf(suite).filter((p) => p.status === "live")
+    const current = platformForPath(path)
+    const active = !!current && suite.platforms.includes(current.code)
     const [open, setOpen] = useState(active)
     const [prevActive, setPrevActive] = useState(active)
     if (active !== prevActive) {
         setPrevActive(active)
         if (active) setOpen(true)
     }
-    const Icon = p.icon
+    const Icon = suite.icon
 
-    if (p.status === "coming-soon") {
+    if (platforms.length === 0) {
         return (
             <div
                 className={cn(
                     "text-muted flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold",
                     collapsed && "lg:justify-center lg:px-0",
                 )}
-                title={`${p.name}: coming soon`}
+                title={`${suite.name}: coming soon`}
             >
-                <PlatformIcon icon={<Icon />} accent={p.accent} muted />
-                <span className={cn("flex-1 truncate", collapsed && "lg:hidden")}>{p.name}</span>
+                <PlatformIcon icon={<Icon />} accent={suite.accent} muted />
+                <span className={cn("flex-1 truncate", collapsed && "lg:hidden")}>{suite.name}</span>
                 <span
                     className={cn(
                         "bg-bg-2 text-muted rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase",
@@ -205,30 +212,43 @@ function PlatformGroup({ p, collapsed }: { p: PlatformDefinition; collapsed: boo
         )
     }
 
+    const expanded = <Expanded suite={suite} platforms={platforms} open={open} setOpen={setOpen} active={active} />
+
     if (collapsed) {
         return (
             <>
                 <Link
-                    href={p.basePath}
-                    title={p.name}
+                    href={(active && current ? current : platforms[0]).basePath}
+                    title={suite.name}
                     className={cn(
                         "hidden items-center justify-center rounded-xl py-2.5 transition-colors lg:flex",
                         active ? "bg-primary-soft" : "hover:bg-bg-2",
                     )}
                 >
-                    <PlatformIcon icon={<Icon />} accent={p.accent} />
+                    <PlatformIcon icon={<Icon />} accent={suite.accent} />
                 </Link>
-                <div className="lg:hidden">
-                    <Expanded p={p} open={open} setOpen={setOpen} active={active} />
-                </div>
+                <div className="lg:hidden">{expanded}</div>
             </>
         )
     }
-    return <Expanded p={p} open={open} setOpen={setOpen} active={active} />
+    return expanded
 }
 
-function Expanded({ p, open, setOpen, active }: { p: PlatformDefinition; open: boolean; setOpen: (v: boolean) => void; active: boolean }) {
-    const Icon = p.icon
+function Expanded({
+    suite,
+    platforms,
+    open,
+    setOpen,
+    active,
+}: {
+    suite: SuiteDefinition
+    platforms: PlatformDefinition[]
+    open: boolean
+    setOpen: (v: boolean) => void
+    active: boolean
+}) {
+    const Icon = suite.icon
+    const grouped = platforms.length > 1
     return (
         <div>
             <button
@@ -240,23 +260,36 @@ function Expanded({ p, open, setOpen, active }: { p: PlatformDefinition; open: b
                     active ? "text-ink" : "text-ink-2 hover:bg-bg-2 hover:text-ink",
                 )}
             >
-                <PlatformIcon icon={<Icon />} accent={p.accent} />
-                <span className="flex-1 truncate">{p.name}</span>
+                <PlatformIcon icon={<Icon />} accent={suite.accent} />
+                <span className="min-w-0 flex-1">
+                    <span className="block truncate">{suite.name}</span>
+                    {grouped && <span className="text-muted block truncate text-[11px] font-medium">{suite.description}</span>}
+                </span>
                 <ChevronDown className={cn("text-muted size-4 transition-transform duration-300", open && "rotate-180")} />
             </button>
             <div className={cn("grid transition-[grid-template-rows] duration-300 ease-out", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
                 <div className="overflow-hidden">
                     <div className="before:bg-line-strong relative mt-1 space-y-0.5 pb-1 before:absolute before:top-1 before:bottom-2 before:left-[27px] before:w-px">
-                        {p.nav.map((n) => (
-                            <NavLink
-                                key={n.href}
-                                href={n.href}
-                                label={n.label}
-                                icon={<n.icon />}
-                                exact={n.href === p.basePath}
-                                collapsed={false}
-                                nested
-                            />
+                        {platforms.map((p) => (
+                            <div key={p.code} className={cn(grouped && "pt-1.5 first:pt-0")}>
+                                {grouped && (
+                                    <div className="text-muted flex items-center gap-1.5 py-1.5 pr-3 pl-11 text-[10.5px] font-bold tracking-[.08em] uppercase">
+                                        <p.icon className="size-3.5" style={{ color: p.accent }} />
+                                        {p.name}
+                                    </div>
+                                )}
+                                {p.nav.map((n) => (
+                                    <NavLink
+                                        key={n.href}
+                                        href={n.href}
+                                        label={n.label}
+                                        icon={<n.icon />}
+                                        exact={n.href === p.basePath}
+                                        collapsed={false}
+                                        nested
+                                    />
+                                ))}
+                            </div>
                         ))}
                     </div>
                 </div>

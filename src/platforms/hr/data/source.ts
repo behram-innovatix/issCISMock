@@ -1,14 +1,11 @@
-import { DATA_SOURCE } from "@/lib/data-source"
-import { hrApiSource } from "./api"
-import { hrMockSource } from "./mock"
+import { fetchInsights, metaOf } from "@/lib/insights"
 import type { HrDataset } from "./types"
 
 /**
- * Contract between the CIS screens and the HR platform. Screens only go through hooks that call
- * this interface, so swapping mock data for the real ISSPHERE endpoints is a one-line change.
+ * Loads the HR dashboards' data from the CIS API. Until an HR source (the HRM cis-export API) is
+ * connected and synced, the API reports the platform as not connected and the screens say so.
  */
-export interface HrDataSource {
-    load(): Promise<HrDataset>
+export async function loadHr(): Promise<HrDataset> {
+    const payload = await fetchInsights<Partial<HrDataset>>("hr")
+    return { employees: payload.connected ? (payload.employees ?? []) : [], meta: metaOf(payload) }
 }
-
-export const hrSource: HrDataSource = DATA_SOURCE === "api" ? hrApiSource : hrMockSource

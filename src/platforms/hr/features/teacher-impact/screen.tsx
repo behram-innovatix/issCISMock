@@ -116,7 +116,7 @@ export function HrTeacherImpactScreen() {
     const impact = useHr((s) => s.impact)
     const setImpact = useHr((s) => s.setImpact)
     return (
-        <HrPage title="Teacher Impact" description="Each teacher's classes from Issphere EDU, side by side with their HR record.">
+        <HrPage title="Teacher Impact" description="Each teacher's classes from EDU, side by side with their HR record.">
             {(ctx) => <ImpactBody ctx={ctx} impact={impact} setImpact={setImpact} router={router} />}
         </HrPage>
     )

@@ -52,7 +52,7 @@ export const useEdu = create<EduState>((set) => ({
                 ...s.filters,
                 yg,
                 sec: "all",
-                stage: yg === "all" ? s.filters.stage : (YGS.find((y) => y[0] === yg)![1] as Stage),
+                stage: yg === "all" ? s.filters.stage : ((YGS.find((y) => y[0] === yg)?.[1] ?? s.filters.stage) as Stage),
             },
             register: { ...s.register, page: 0 },
         })),

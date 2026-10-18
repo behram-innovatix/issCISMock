@@ -1,5 +1,6 @@
 import {
     ArrowLeftRight,
+    Boxes,
     Award,
     CalendarCheck,
     CalendarClock,
@@ -44,7 +45,7 @@ export interface PlatformDefinition {
 export const PLATFORMS: PlatformDefinition[] = [
     {
         code: "edu",
-        name: "Issphere EDU",
+        name: "EDU",
         description: "Enrolment, attendance and behaviour across all schools",
         icon: GraduationCap,
         basePath: "/edu",
@@ -95,3 +96,26 @@ export const PLATFORMS: PlatformDefinition[] = [
 ]
 
 export const platformForPath = (path: string) => PLATFORMS.find((p) => path === p.basePath || path.startsWith(p.basePath + "/"))
+
+export interface SuiteDefinition {
+    code: string
+    name: string
+    description: string
+    icon: LucideIcon
+    accent: string
+    /** platform codes, in sidebar order */
+    platforms: string[]
+}
+
+/**
+ * How platforms are grouped in the sidebar and breadcrumbs. A suite with one platform shows as that
+ * platform; a suite with several (ERP) shows one entry with a sub-heading per platform.
+ */
+export const SUITES: SuiteDefinition[] = [
+    { code: "edu", name: "EDU", description: "Students and schools", icon: GraduationCap, accent: "var(--c1)", platforms: ["edu"] },
+    { code: "erp", name: "ERP", description: "HR and Finance", icon: Boxes, accent: "var(--c2)", platforms: ["hr", "fin"] },
+]
+
+export const platformsOf = (suite: SuiteDefinition) => suite.platforms.map((code) => PLATFORMS.find((p) => p.code === code)!)
+
+export const suiteOf = (platform: PlatformDefinition) => SUITES.find((s) => s.platforms.includes(platform.code))

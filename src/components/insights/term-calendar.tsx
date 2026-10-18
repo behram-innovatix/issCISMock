@@ -1,19 +1,23 @@
 import { Tip } from "@/components/ui/tip"
-import { NW } from "@/lib/calendar"
+import { AS_OF, dateOf, NW } from "@/lib/calendar"
 import { cn } from "@/lib/cn"
 import type { ReactNode } from "react"
 
-const TERM_START = new Date(2026, 7, 23)
-const MONTHS = [
-    { y: 2026, m: 7 },
-    { y: 2026, m: 8 },
-    { y: 2026, m: 9 },
-]
+/** Every month the reporting window touches, from its first Sunday to the data date. */
+function windowMonths() {
+    const start = dateOf(0, 0)
+    const months: { y: number; m: number }[] = []
+    for (let d = new Date(start.getFullYear(), start.getMonth(), 1); d <= AS_OF; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+        months.push({ y: d.getFullYear(), m: d.getMonth() })
+    }
+    return months
+}
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 /** Maps a calendar date to the term's (week, day) index, or null if it is not a recorded school day. */
 export function termIndex(dt: Date): { w: number; d: number } | null {
-    const diff = Math.round((dt.getTime() - TERM_START.getTime()) / 86400000)
+    const start = dateOf(0, 0)
+    const diff = Math.round((dt.getTime() - start.getTime()) / 86400000)
     if (diff < 0) return null
     const w = Math.floor(diff / 7)
     const d = diff % 7
@@ -26,16 +30,16 @@ export interface DayCell {
     tip: ReactNode
 }
 
-/** Aug–Oct 2026 month grid. Weekends (Fri/Sat) are hatched, days outside the recorded term are dashed. */
+/** Month grid of the reporting window. Weekends (Fri/Sat) are hatched, days outside the window are dashed. */
 export function TermCalendar({ cell }: { cell: (w: number, d: number, date: Date) => DayCell }) {
     return (
-        <div className="grid gap-5 md:grid-cols-3">
-            {MONTHS.map(({ y, m }) => {
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-5">
+            {windowMonths().map(({ y, m }) => {
                 const first = new Date(y, m, 1)
                 const days = new Date(y, m + 1, 0).getDate()
                 const lead = first.getDay()
                 return (
-                    <div key={m}>
+                    <div key={`${y}-${m}`}>
                         <div className="text-ink mb-2 text-[12.5px] font-semibold">
                             {first.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
                         </div>

@@ -89,7 +89,7 @@ export interface HrFilters {
     location: string
     dept: string
     role: RoleFilter
-    w0: 0 | 3 | 5
+    w0: number
 }
 export const DEFAULT_HR_FILTERS: HrFilters = { location: "all", dept: "all", role: "all", w0: 0 }
 

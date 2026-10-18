@@ -1,6 +1,7 @@
 "use client"
 
 import { PageHeader } from "@/components/shell/page-header"
+import { NotConnected } from "@/components/insights/not-connected"
 import { ScreenSkeleton } from "@/components/ui/skeleton"
 import { TERM_LABEL } from "@/lib/calendar"
 import type { ReactNode } from "react"
@@ -32,9 +33,11 @@ export function EduPage({
     const { data, analysis, filters, error } = useEduAnalysis()
     return (
         <>
-            <PageHeader eyebrow={`Issphere EDU · ${TERM_LABEL}`} title={title} description={description} actions={actions} />
+            <PageHeader eyebrow={TERM_LABEL ? `EDU · ${TERM_LABEL}` : "EDU"} title={title} description={description} actions={actions} />
             {error ? (
                 <div className="border-bad/20 bg-bad-soft text-bad-ink rounded-2xl border p-5 text-[13px]">{String(error)}</div>
+            ) : data && !data.meta.connected ? (
+                <NotConnected name="EDU" meta={data.meta} />
             ) : !data || !analysis ? (
                 <ScreenSkeleton />
             ) : (

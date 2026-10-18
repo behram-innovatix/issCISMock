@@ -18,7 +18,11 @@ export function Input({
             </label>
             <div className="border-line bg-surface focus-within:border-primary/40 focus-within:ring-primary/10 flex h-11 items-center gap-2.5 rounded-xl border px-3.5 transition-all focus-within:ring-4">
                 {icon && <span className="text-muted shrink-0 [&>svg]:size-4">{icon}</span>}
-                <input id={inputId} {...props} className="placeholder:text-muted text-ink w-full min-w-0 bg-transparent text-[13.5px] outline-none" />
+                <input
+                    id={inputId}
+                    {...props}
+                    className="placeholder:text-muted text-ink w-full min-w-0 bg-transparent text-[13.5px] outline-none"
+                />
                 {trailing}
             </div>
         </div>

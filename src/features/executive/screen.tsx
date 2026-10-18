@@ -3,6 +3,7 @@
 import { Sparkline, TrendChart } from "@/components/charts/charts"
 import { Legend } from "@/components/insights/legend"
 import { Avatar } from "@/components/ui/avatar"
+import { buttonClass } from "@/components/ui/button"
 import { Grid, Panel } from "@/components/ui/panel"
 import { Pill } from "@/components/ui/pill"
 import { ScreenSkeleton } from "@/components/ui/skeleton"
@@ -21,7 +22,7 @@ import { analyseHr, DEFAULT_HR_FILTERS, type HrAnalysis } from "@/platforms/hr/a
 import { locationOf, ratingOf } from "@/platforms/hr/data/constants"
 import { useHrData } from "@/platforms/hr/hooks"
 import { PLATFORMS, type PlatformDefinition } from "@/platforms/registry"
-import { ArrowUpRight, Clock3 } from "lucide-react"
+import { ArrowUpRight, Cable, Clock3 } from "lucide-react"
 import Link from "next/link"
 import { type ReactNode, useMemo } from "react"
 
@@ -33,11 +34,24 @@ interface Headline {
     trend?: number[]
 }
 
+/** The analyses of the platforms that have connected data; null for one that hasn't. */
+interface Analyses {
+    edu: EduAnalysis | null
+    hr: HrAnalysis | null
+    fin: FinAnalysis | null
+}
+
 /** Headline metrics each platform contributes to the executive view, keyed by registry code. */
-const HEADLINES: Record<string, (edu: EduAnalysis, hr: HrAnalysis, fin: FinAnalysis) => Headline[]> = {
+const HEADLINES: { [K in keyof Analyses]: (a: NonNullable<Analyses[K]>) => Headline[] } = {
     edu: (a) => [
-        { label: "Students", value: fmt(a.n), note: `${pct(a.util, 0)} of capacity` },
-        { label: "Attendance", value: pct(a.att), note: ATT_LABEL[a.attTone], tone: a.attTone, trend: a.weeks.map((w) => w.att) },
+        { label: "Students", value: fmt(a.n), note: a.cap ? `${pct(a.util, 0)} of capacity` : `${fmt(a.secsIn.length)} sections` },
+        {
+            label: "Attendance",
+            value: pct(a.att),
+            note: ATT_LABEL[a.attTone],
+            tone: a.attTone,
+            trend: a.weeks.map((w) => w.att).filter((v): v is number => v !== null),
+        },
         {
             label: "At risk",
             value: fmt(a.totals.atRisk),
@@ -51,7 +65,7 @@ const HEADLINES: Record<string, (edu: EduAnalysis, hr: HrAnalysis, fin: FinAnaly
             trend: a.behaviourWeeks.map((w) => w.ach + w.inc),
         },
     ],
-    hr: (_, h) => [
+    hr: (h) => [
         { label: "Staff", value: fmt(h.n), note: `${fmt(h.teaching)} teaching · ${fmt(h.support)} support` },
         {
             label: "Attendance",
@@ -73,7 +87,7 @@ const HEADLINES: Record<string, (edu: EduAnalysis, hr: HrAnalysis, fin: FinAnaly
             tone: h.atRisk / (h.n || 1) < 0.05 ? "good" : h.atRisk / (h.n || 1) < 0.1 ? "warn" : "bad",
         },
     ],
-    fin: (_, __, f) => [
+    fin: (f) => [
         {
             label: "Income YTD",
             value: qar(f.income),
@@ -103,28 +117,39 @@ const HEADLINES: Record<string, (edu: EduAnalysis, hr: HrAnalysis, fin: FinAnaly
     ],
 }
 
+const headlinesFor = (code: string, all: Analyses): Headline[] | null => {
+    if (code === "edu") return all.edu && HEADLINES.edu(all.edu)
+    if (code === "hr") return all.hr && HEADLINES.hr(all.hr)
+    if (code === "fin") return all.fin && HEADLINES.fin(all.fin)
+    return null
+}
+
 export function ExecutiveOverviewScreen() {
     const { data: eduData } = useEduData()
     const { data: hrData } = useHrData()
     const { data: finData } = useFinData()
     const all = useMemo(() => {
         if (!eduData || !hrData || !finData) return null
-        const edu = analyseEdu(eduData, DEFAULT_EDU_FILTERS)
-        const hr = analyseHr(hrData, DEFAULT_HR_FILTERS)
-        const fin = analyseFin(finData, DEFAULT_FIN_FILTERS)
-        const schools = SCHOOLS.map((s) => {
-            const e = analyseEdu(eduData, { ...DEFAULT_EDU_FILTERS, school: s.id })
-            const h = analyseHr(hrData, { ...DEFAULT_HR_FILTERS, location: s.id })
-            const fn = analyseFin(finData, { ...DEFAULT_FIN_FILTERS, location: s.id })
-            return { s, e, h, fn }
-        })
-        return { edu, hr, fin, schools }
+        const analyses: Analyses = {
+            edu: eduData.meta.connected ? analyseEdu(eduData, DEFAULT_EDU_FILTERS) : null,
+            hr: hrData.meta.connected ? analyseHr(hrData, DEFAULT_HR_FILTERS) : null,
+            fin: finData.meta.connected ? analyseFin(finData, DEFAULT_FIN_FILTERS) : null,
+        }
+        const schools = SCHOOLS.map((s) => ({
+            s,
+            e: analyses.edu && analyseEdu(eduData, { ...DEFAULT_EDU_FILTERS, school: s.id }),
+            h: analyses.hr && analyseHr(hrData, { ...DEFAULT_HR_FILTERS, location: s.id }),
+            fn: analyses.fin && analyseFin(finData, { ...DEFAULT_FIN_FILTERS, location: s.id }),
+        }))
+        return { ...analyses, schools }
     }, [eduData, hrData, finData])
+
+    const connected = all ? [all.edu, all.hr, all.fin].filter(Boolean).length : 0
 
     return (
         <>
             <PageHeader
-                eyebrow={`Executive Overview · ${TERM_LABEL}`}
+                eyebrow={all?.edu && TERM_LABEL ? `Executive Overview · ${TERM_LABEL}` : "Executive Overview"}
                 title={
                     <>
                         Organisation <span className="text-gradient">at a glance</span>
@@ -138,134 +163,174 @@ export function ExecutiveOverviewScreen() {
                 <div className="space-y-4">
                     <div className="grid gap-4 xl:grid-cols-3">
                         {PLATFORMS.filter((p) => p.status === "live").map((p) => (
-                            <PlatformStrip key={p.code} p={p} items={HEADLINES[p.code]?.(all.edu, all.hr, all.fin) ?? []} />
+                            <PlatformStrip key={p.code} p={p} items={headlinesFor(p.code, all)} />
                         ))}
                     </div>
-                    <Grid>
-                        <Panel
-                            span={8}
-                            title="Attendance: students vs staff"
-                            subtitle="Weekly attendance across the organisation"
-                            action={
-                                <Legend
-                                    items={[
-                                        { label: "Students", color: "var(--c1)" },
-                                        { label: "Staff", color: "var(--c2)" },
-                                    ]}
-                                />
-                            }
-                        >
-                            <TrendChart
-                                height={420}
-                                data={all.edu.weeks.map((w, i) => ({ label: w.label, students: w.att, staff: all.hr.weeks[i]?.att }))}
-                                series={[
-                                    { key: "students", label: "Students", color: "var(--c1)", fill: true },
-                                    { key: "staff", label: "Staff", color: "var(--c2)", fill: true },
-                                ]}
-                                yDomain={[(min: number) => Math.max(0, Math.floor(Math.min(min, 90) - 2)), 100]}
-                                yFormat={(v) => `${v}%`}
-                                valueFormat={(v) => pct(v)}
-                                target={{ value: 95, label: "Target 95%" }}
-                                titlePrefix="Week of "
-                            />
-                        </Panel>
-                        <Alerts edu={all.edu} hr={all.hr} fin={all.fin} />
-                        <Panel span={12} title="School comparison" subtitle="Students, staff and finances side by side for each school">
-                            <div className="-mx-1 overflow-x-auto px-1">
-                                <table className="w-full min-w-[1180px] border-separate border-spacing-y-1 text-[13px]">
-                                    <thead>
-                                        <tr className="text-muted text-[10.5px] font-bold tracking-[.12em] uppercase">
-                                            <th className="min-w-[210px] px-3 pb-1.5 text-left">School</th>
-                                            <th className="px-3 pb-1.5 text-right">Students</th>
-                                            <th className="px-3 pb-1.5 text-right">Student attendance</th>
-                                            <th className="px-3 pb-1.5 text-right">Students at risk</th>
-                                            <th className="px-3 pb-1.5 text-right">Net behaviour / student</th>
-                                            <th className="px-3 pb-1.5 text-right">Staff</th>
-                                            <th className="px-3 pb-1.5 text-right">Staff attendance</th>
-                                            <th className="px-3 pb-1.5 text-right">Avg appraisal</th>
-                                            <th className="px-3 pb-1.5 text-right">Students / teacher</th>
-                                            <th className="px-3 pb-1.5 text-right">Fee collection</th>
-                                            <th className="px-3 pb-1.5 text-right">Outstanding</th>
-                                            <th className="px-3 pb-1.5 text-right">Budget variance</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {all.schools.map(({ s, e, h, fn }) => {
-                                            const net = e.n ? (e.totals.ACH - e.totals.INC) / e.n : 0
-                                            const cells = [
-                                                fmt(e.n),
-                                                <Pill key="a" tone={e.attTone}>
-                                                    {pct(e.att)}
-                                                </Pill>,
-                                                <span key="r" className="tabular text-ink-2">
-                                                    {fmt(e.totals.atRisk)}{" "}
-                                                    <span className="text-muted">({pct(e.n ? (e.totals.atRisk / e.n) * 100 : 0, 0)})</span>
-                                                </span>,
-                                                <span
-                                                    key="n"
-                                                    className={cn("tabular font-semibold", net >= 0 ? "text-good-ink" : "text-bad-ink")}
-                                                >
-                                                    {net >= 0 ? "+" : "−"}
-                                                    {Math.abs(net).toFixed(1)}
-                                                </span>,
-                                                fmt(h.n),
-                                                <Pill key="s" tone={statusOf(h.att)}>
-                                                    {pct(h.att)}
-                                                </Pill>,
-                                                <b key="p" className="tabular text-ink font-semibold">
-                                                    {score(h.avgAppraisal)}
-                                                </b>,
-                                                <span key="t" className="tabular text-ink-2">
-                                                    {h.teaching ? (e.n / h.teaching).toFixed(1) : "–"}
-                                                </span>,
-                                                <Pill key="f" tone={collectionTone(fn.fees.rate)}>
-                                                    {pct(fn.fees.rate)}
-                                                </Pill>,
-                                                <span key="o" className="tabular text-ink-2">
-                                                    {qar(fn.fees.outstanding)}
-                                                </span>,
-                                                <Pill key="b" tone={varianceTone(fn.budget.varPct)}>
-                                                    {signedPct(fn.budget.varPct)}
-                                                </Pill>,
-                                            ]
-                                            return (
-                                                <tr key={s.id} className="group">
-                                                    <td className="bg-surface-2 group-hover:bg-primary-softer rounded-l-xl px-3 py-3 transition-colors">
-                                                        <b className="text-ink block font-semibold">{s.name}</b>
-                                                        <span className="text-muted text-[11.5px]">{s.intake}</span>
-                                                    </td>
-                                                    {cells.map((c, i) => (
-                                                        <td
-                                                            key={i}
-                                                            className={cn(
-                                                                "tabular bg-surface-2 text-ink-2 group-hover:bg-primary-softer px-3 py-3 text-right transition-colors",
-                                                                i === cells.length - 1 && "rounded-r-xl",
-                                                            )}
-                                                        >
-                                                            {c}
-                                                        </td>
-                                                    ))}
-                                                </tr>
-                                            )
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </Panel>
-                        {PLATFORMS.filter((p) => p.status === "coming-soon").map((p) => (
-                            <ComingSoon key={p.code} p={p} />
-                        ))}
-                    </Grid>
+                    {connected > 0 && (
+                        <Grid>
+                            {(all.edu || all.hr) && <AttendancePanel edu={all.edu} hr={all.hr} />}
+                            <Alerts {...all} />
+                            {all.schools.length > 0 && <SchoolComparison all={all} />}
+                            {PLATFORMS.filter((p) => p.status === "coming-soon").map((p) => (
+                                <ComingSoon key={p.code} p={p} />
+                            ))}
+                        </Grid>
+                    )}
                 </div>
             )}
         </>
     )
 }
 
-function PlatformStrip({ p, items }: { p: PlatformDefinition; items: Headline[] }) {
+function AttendancePanel({ edu, hr }: { edu: EduAnalysis | null; hr: HrAnalysis | null }) {
+    const weeks = edu?.weeks ?? hr?.weeks ?? []
+    const series = [
+        ...(edu ? [{ key: "students", label: "Students", color: "var(--c1)", fill: true }] : []),
+        ...(hr ? [{ key: "staff", label: "Staff", color: "var(--c2)", fill: true }] : []),
+    ]
+    return (
+        <Panel
+            span={8}
+            title={edu && hr ? "Attendance: students vs staff" : edu ? "Student attendance" : "Staff attendance"}
+            subtitle="Weekly attendance across the organisation"
+            action={<Legend items={series.map((s) => ({ label: s.label, color: s.color }))} />}
+        >
+            <TrendChart
+                height={420}
+                data={weeks.map((w, i) => ({ label: w.label, students: edu?.weeks[i]?.att ?? null, staff: hr?.weeks[i]?.att ?? null }))}
+                series={series}
+                yDomain={[(min: number) => Math.max(0, Math.floor(Math.min(min, 90) - 2)), 100]}
+                yFormat={(v) => `${v}%`}
+                valueFormat={(v) => pct(v)}
+                target={{ value: 95, label: "Target 95%" }}
+                titlePrefix="Week of "
+            />
+        </Panel>
+    )
+}
+
+type SchoolRow = { s: (typeof SCHOOLS)[number]; e: EduAnalysis | null; h: HrAnalysis | null; fn: FinAnalysis | null }
+
+function SchoolComparison({ all }: { all: Analyses & { schools: SchoolRow[] } }) {
+    const columns: { header: string; cell: (r: SchoolRow) => ReactNode }[] = [
+        ...(all.edu
+            ? [
+                  { header: "Students", cell: (r: SchoolRow) => fmt(r.e!.n) },
+                  {
+                      header: "Student attendance",
+                      cell: (r: SchoolRow) => <Pill tone={r.e!.attTone}>{pct(r.e!.att)}</Pill>,
+                  },
+                  {
+                      header: "Students at risk",
+                      cell: (r: SchoolRow) => (
+                          <span className="tabular text-ink-2">
+                              {fmt(r.e!.totals.atRisk)}{" "}
+                              <span className="text-muted">({pct(r.e!.n ? (r.e!.totals.atRisk / r.e!.n) * 100 : 0, 0)})</span>
+                          </span>
+                      ),
+                  },
+                  {
+                      header: "Net behaviour / student",
+                      cell: (r: SchoolRow) => {
+                          const net = r.e!.n ? (r.e!.totals.ACH - r.e!.totals.INC) / r.e!.n : 0
+                          return (
+                              <span className={cn("tabular font-semibold", net >= 0 ? "text-good-ink" : "text-bad-ink")}>
+                                  {net >= 0 ? "+" : "−"}
+                                  {Math.abs(net).toFixed(1)}
+                              </span>
+                          )
+                      },
+                  },
+              ]
+            : []),
+        ...(all.hr
+            ? [
+                  { header: "Staff", cell: (r: SchoolRow) => fmt(r.h!.n) },
+                  { header: "Staff attendance", cell: (r: SchoolRow) => <Pill tone={statusOf(r.h!.att)}>{pct(r.h!.att)}</Pill> },
+                  {
+                      header: "Avg appraisal",
+                      cell: (r: SchoolRow) => <b className="tabular text-ink font-semibold">{score(r.h!.avgAppraisal)}</b>,
+                  },
+                  ...(all.edu
+                      ? [
+                            {
+                                header: "Students / teacher",
+                                cell: (r: SchoolRow) => (
+                                    <span className="tabular text-ink-2">{r.h!.teaching ? (r.e!.n / r.h!.teaching).toFixed(1) : "–"}</span>
+                                ),
+                            },
+                        ]
+                      : []),
+              ]
+            : []),
+        ...(all.fin
+            ? [
+                  {
+                      header: "Fee collection",
+                      cell: (r: SchoolRow) => <Pill tone={collectionTone(r.fn!.fees.rate)}>{pct(r.fn!.fees.rate)}</Pill>,
+                  },
+                  {
+                      header: "Outstanding",
+                      cell: (r: SchoolRow) => <span className="tabular text-ink-2">{qar(r.fn!.fees.outstanding)}</span>,
+                  },
+                  {
+                      header: "Budget variance",
+                      cell: (r: SchoolRow) => <Pill tone={varianceTone(r.fn!.budget.varPct)}>{signedPct(r.fn!.budget.varPct)}</Pill>,
+                  },
+              ]
+            : []),
+    ]
+    const parts = [all.edu && "students", all.hr && "staff", all.fin && "finances"].filter(Boolean)
+
+    return (
+        <Panel
+            span={12}
+            title="School comparison"
+            subtitle={`${parts.join(", ").replace(/, ([^,]*)$/, " and $1")} side by side for each school`}
+        >
+            <div className="-mx-1 overflow-x-auto px-1">
+                <table className="w-full border-separate border-spacing-y-1 text-[13px]" style={{ minWidth: 210 + columns.length * 110 }}>
+                    <thead>
+                        <tr className="text-muted text-[10.5px] font-bold tracking-[.12em] uppercase">
+                            <th className="min-w-[210px] px-3 pb-1.5 text-left">School</th>
+                            {columns.map((c) => (
+                                <th key={c.header} className="px-3 pb-1.5 text-right">
+                                    {c.header}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {all.schools.map((r) => (
+                            <tr key={r.s.id} className="group">
+                                <td className="bg-surface-2 group-hover:bg-primary-softer rounded-l-xl px-3 py-3 transition-colors">
+                                    <b className="text-ink block font-semibold">{r.s.name}</b>
+                                    <span className="text-muted text-[11.5px]">{r.s.intake}</span>
+                                </td>
+                                {columns.map((c, i) => (
+                                    <td
+                                        key={c.header}
+                                        className={cn(
+                                            "tabular bg-surface-2 text-ink-2 group-hover:bg-primary-softer px-3 py-3 text-right transition-colors",
+                                            i === columns.length - 1 && "rounded-r-xl",
+                                        )}
+                                    >
+                                        {c.cell(r)}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </Panel>
+    )
+}
+
+function PlatformStrip({ p, items }: { p: PlatformDefinition; items: Headline[] | null }) {
     const Icon = p.icon
     return (
-        <section className="animate-rise border-line bg-surface shadow-card rounded-2xl border p-5">
+        <section className="animate-rise border-line bg-surface shadow-card flex flex-col rounded-2xl border p-5">
             <header className="mb-4 flex items-center gap-3">
                 <span
                     className="flex size-9 items-center justify-center rounded-xl [&>svg]:size-[18px]"
@@ -277,85 +342,113 @@ function PlatformStrip({ p, items }: { p: PlatformDefinition; items: Headline[] 
                     <h2 className="text-ink text-[15px] font-semibold">{p.name}</h2>
                     <p className="text-muted truncate text-[12px]">{p.description}</p>
                 </div>
-                <Link
-                    href={p.basePath}
-                    className="bg-primary-soft text-primary inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-[12px] font-semibold transition-colors hover:bg-[rgba(47,91,216,.12)]"
-                >
-                    Open <ArrowUpRight className="size-3.5" />
-                </Link>
+                {items && (
+                    <Link
+                        href={p.basePath}
+                        className="bg-primary-soft text-primary inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-[12px] font-semibold transition-colors hover:bg-[rgba(47,91,216,.12)]"
+                    >
+                        Open <ArrowUpRight className="size-3.5" />
+                    </Link>
+                )}
             </header>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-2">
-                {items.map((it) => (
-                    <div key={it.label} className="bg-surface-2 rounded-xl p-3">
-                        <div className="text-ink-2 truncate text-[11.5px] font-semibold">{it.label}</div>
-                        <div className="tabular font-display text-ink mt-1 text-[21px] leading-tight font-semibold">{it.value}</div>
-                        {it.trend ? (
-                            <Sparkline data={it.trend} color={it.tone ? `var(--${it.tone})` : p.accent} height={28} />
-                        ) : (
-                            <div className="h-[28px]" />
-                        )}
-                        <div className="text-muted mt-1 flex items-start gap-1.5 text-[11.5px] leading-snug">
-                            {it.tone && (
-                                <i className="mt-[5px] size-1.5 shrink-0 rounded-full" style={{ background: `var(--${it.tone})` }} />
+            {items ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-2">
+                    {items.map((it) => (
+                        <div key={it.label} className="bg-surface-2 rounded-xl p-3">
+                            <div className="text-ink-2 truncate text-[11.5px] font-semibold">{it.label}</div>
+                            <div className="tabular font-display text-ink mt-1 text-[21px] leading-tight font-semibold">{it.value}</div>
+                            {it.trend ? (
+                                <Sparkline data={it.trend} color={it.tone ? `var(--${it.tone})` : p.accent} height={28} />
+                            ) : (
+                                <div className="h-[28px]" />
                             )}
-                            <span className={it.tone ? `font-semibold text-${it.tone}-ink` : undefined}>{it.note}</span>
+                            <div className="text-muted mt-1 flex items-start gap-1.5 text-[11.5px] leading-snug">
+                                {it.tone && (
+                                    <i className="mt-[5px] size-1.5 shrink-0 rounded-full" style={{ background: `var(--${it.tone})` }} />
+                                )}
+                                <span className={it.tone ? `font-semibold text-${it.tone}-ink` : undefined}>{it.note}</span>
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="border-line-strong flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-8 text-center">
+                    <p className="text-muted text-[12.5px]">No {p.name} data connected yet.</p>
+                    <Link href="/admin/connections" className={buttonClass("soft", "sm")}>
+                        <Cable className="size-3.5" /> Connections
+                    </Link>
+                </div>
+            )}
         </section>
     )
 }
 
-function Alerts({ edu, hr, fin }: { edu: EduAnalysis; hr: HrAnalysis; fin: FinAnalysis }) {
-    const students = edu.list
-        .filter((s) => s.m.status === "bad")
-        .sort((a, b) => a.m.att - b.m.att)
-        .slice(0, 3)
-        .map((s) => ({
-            id: s.id,
-            name: s.name,
-            meta: `Student · ${secName(s.yg, s.sec)} · ${schoolOf(s.school).short}`,
-            value: pct(s.m.att),
-            reason: s.m.att < 90 ? "Persistent absence" : "Behaviour concern",
-            href: `/edu/students/${s.id}`,
-        }))
-    const staff = hr.list
-        .filter((e) => e.m.status === "bad")
-        .sort((a, b) => a.m.att - b.m.att)
-        .slice(0, 3)
-        .map((e) => ({
-            id: 100000 + e.id,
-            name: e.name,
-            meta: `${e.role} · ${locationOf(e.location).short}`,
-            value: pct(e.m.att),
-            reason: e.m.att < 90 ? "Low attendance" : "Low appraisal",
-            href: `/hr/staff/${e.id}`,
-        }))
-    const accounts = fin.list
-        .filter((a) => a.m.status === "arrears")
-        .sort((a, b) => b.m.overdue - a.m.overdue)
-        .slice(0, 3)
-        .map((a) => ({
-            id: 200000 + a.id,
-            name: a.name,
-            meta: `Fee account · ${secName(a.yg, a.sec)} · ${schoolOf(a.school).short}`,
-            value: money(a.m.overdue),
-            reason: a.m.daysOverdue > 90 ? "90+ days overdue" : a.m.prior >= 1 ? "Prior term unpaid" : `${a.m.daysOverdue} days overdue`,
-            href: `/fin/accounts/${a.id}`,
-        }))
+function Alerts({ edu, hr, fin }: Analyses) {
+    const groups = [
+        edu && {
+            label: "Students",
+            more: "/edu/students",
+            items: edu.list
+                .filter((s) => s.m.status === "bad")
+                .sort((a, b) => a.m.att - b.m.att)
+                .slice(0, 3)
+                .map((s) => ({
+                    id: `edu:${s.id}`,
+                    name: s.name,
+                    meta: `Student · ${secName(s.yg, s.sec)} · ${schoolOf(s.school).short}`,
+                    value: pct(s.m.att),
+                    reason: s.m.tot && s.m.att < 90 ? "Persistent absence" : "Behaviour concern",
+                    href: `/edu/students/${encodeURIComponent(s.id)}`,
+                })),
+        },
+        hr && {
+            label: "Staff",
+            more: "/hr/staff",
+            items: hr.list
+                .filter((e) => e.m.status === "bad")
+                .sort((a, b) => a.m.att - b.m.att)
+                .slice(0, 3)
+                .map((e) => ({
+                    id: `hr:${e.id}`,
+                    name: e.name,
+                    meta: `${e.role} · ${locationOf(e.location).short}`,
+                    value: pct(e.m.att),
+                    reason: e.m.att < 90 ? "Low attendance" : "Low appraisal",
+                    href: `/hr/staff/${encodeURIComponent(e.id)}`,
+                })),
+        },
+        fin && {
+            label: "Fee accounts",
+            more: "/fin/accounts",
+            items: fin.list
+                .filter((a) => a.m.status === "arrears")
+                .sort((a, b) => b.m.overdue - a.m.overdue)
+                .slice(0, 3)
+                .map((a) => ({
+                    id: `fin:${a.id}`,
+                    name: a.name,
+                    meta: `Fee account · ${secName(a.yg, a.sec)} · ${schoolOf(a.school).short}`,
+                    value: money(a.m.overdue),
+                    reason:
+                        a.m.daysOverdue > 90
+                            ? "90+ days overdue"
+                            : a.m.prior >= 1
+                              ? "Prior term unpaid"
+                              : `${a.m.daysOverdue} days overdue`,
+                    href: `/fin/accounts/${encodeURIComponent(a.id)}`,
+                })),
+        },
+    ].filter((g) => !!g)
+    const flagged = [
+        edu && `${fmt(edu.totals.atRisk)} students`,
+        hr && `${fmt(hr.atRisk)} staff`,
+        fin && `${fmt(fin.fees.arrears)} fee accounts`,
+    ].filter(Boolean)
+
     return (
-        <Panel
-            span={4}
-            title="Alerts"
-            subtitle={`${fmt(edu.totals.atRisk)} students, ${fmt(hr.atRisk)} staff and ${fmt(fin.fees.arrears)} fee accounts flagged`}
-        >
+        <Panel span={edu || hr ? 4 : 12} title="Alerts" subtitle={`${flagged.join(", ").replace(/, ([^,]*)$/, " and $1")} flagged`}>
             <div className="space-y-4">
-                {[
-                    { label: "Students", items: students, more: "/edu/students" },
-                    { label: "Staff", items: staff, more: "/hr/staff" },
-                    { label: "Fee accounts", items: accounts, more: "/fin/accounts" },
-                ].map((g) => (
+                {groups.map((g) => (
                     <div key={g.label}>
                         <div className="mb-1.5 flex items-center justify-between">
                             <span className="eyebrow">{g.label}</span>

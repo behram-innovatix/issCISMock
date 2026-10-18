@@ -1,3 +1,4 @@
+import type { InsightsMeta } from "@/lib/insights"
 import type { Stage } from "./constants"
 
 export type Gender = "M" | "F"
@@ -8,11 +9,12 @@ export interface Section {
     yg: string
     stage: Stage
     sec: string
-    cap: number
-    /** HR employee id of the form tutor (homeroom teacher). */
-    formTutorId: number
-    /** HR employee ids of subject teachers for this section. */
-    subjectTeacherIds: number[]
+    /** seats in the section; null when the source doesn't record capacity */
+    cap: number | null
+    /** staff id of the form tutor (homeroom teacher) */
+    formTutorId: string | null
+    /** staff ids of subject teachers for this section */
+    subjectTeacherIds: string[]
 }
 
 export interface BehaviourEvent {
@@ -21,13 +23,13 @@ export interface BehaviourEvent {
     /** index into BTYPES */
     t: number
     pts: number
-    loc?: string
-    /** HR employee id of the staff member who recorded it. */
-    byStaffId: number
+    loc?: string | null
+    /** staff id of the person who recorded it */
+    byStaffId: string | null
 }
 
 export interface Student {
-    id: number
+    id: string
     name: string
     gender: Gender
     school: string
@@ -35,14 +37,22 @@ export interface Student {
     stage: Stage
     sec: string
     key: string
-    house: string
-    nat: string
+    house: string | null
+    nat: string | null
     /** attendance mark-code index per session (NW × SPW) */
     s: Uint8Array
     ev: BehaviourEvent[]
 }
 
+export interface StaffMember {
+    id: string
+    name: string
+    role: string | null
+}
+
 export interface EduDataset {
     sections: Section[]
     students: Student[]
+    staff: StaffMember[]
+    meta: InsightsMeta
 }
