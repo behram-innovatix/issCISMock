@@ -9,11 +9,14 @@ import { ScreenSkeleton } from "@/components/ui/skeleton"
 import { PageHeader } from "@/components/shell/page-header"
 import { TERM_LABEL } from "@/lib/calendar"
 import { cn } from "@/lib/cn"
-import { fmt, pct, score, signed } from "@/lib/format"
+import { fmt, money, pct, qar, score, signed } from "@/lib/format"
 import { ATT_LABEL, statusOf, type Tone } from "@/lib/status"
 import { analyseEdu, DEFAULT_EDU_FILTERS, type EduAnalysis } from "@/platforms/edu/analytics"
 import { SCHOOLS, schoolOf, secName } from "@/platforms/edu/data/constants"
 import { useEduData } from "@/platforms/edu/hooks"
+import { analyseFin, DEFAULT_FIN_FILTERS, type FinAnalysis } from "@/platforms/fin/analytics"
+import { collectionTone, signedPct, varianceTone } from "@/platforms/fin/components/widgets"
+import { useFinData } from "@/platforms/fin/hooks"
 import { analyseHr, DEFAULT_HR_FILTERS, type HrAnalysis } from "@/platforms/hr/analytics"
 import { locationOf, ratingOf } from "@/platforms/hr/data/constants"
 import { useHrData } from "@/platforms/hr/hooks"
@@ -31,7 +34,7 @@ interface Headline {
 }
 
 /** Headline metrics each platform contributes to the executive view, keyed by registry code. */
-const HEADLINES: Record<string, (edu: EduAnalysis, hr: HrAnalysis) => Headline[]> = {
+const HEADLINES: Record<string, (edu: EduAnalysis, hr: HrAnalysis, fin: FinAnalysis) => Headline[]> = {
     edu: (a) => [
         { label: "Students", value: fmt(a.n), note: `${pct(a.util, 0)} of capacity` },
         { label: "Attendance", value: pct(a.att), note: ATT_LABEL[a.attTone], tone: a.attTone, trend: a.weeks.map((w) => w.att) },
@@ -70,22 +73,53 @@ const HEADLINES: Record<string, (edu: EduAnalysis, hr: HrAnalysis) => Headline[]
             tone: h.atRisk / (h.n || 1) < 0.05 ? "good" : h.atRisk / (h.n || 1) < 0.1 ? "warn" : "bad",
         },
     ],
+    fin: (_, __, f) => [
+        {
+            label: "Income YTD",
+            value: qar(f.income),
+            note: `${qar(f.net)} net surplus`,
+            trend: f.monthly.slice(0, -1).map((m) => Number(m.income)),
+        },
+        {
+            label: "Fee collection",
+            value: pct(f.fees.rate),
+            note: `${pct(f.fees.currentCollected, 0)} of this term`,
+            tone: collectionTone(f.fees.rate),
+            trend: f.fees.curve.map((c) => c.collected),
+        },
+        {
+            label: "Outstanding",
+            value: qar(f.fees.outstanding),
+            note: `${fmt(f.fees.arrears)} accounts in arrears`,
+            tone: f.fees.arrears / (f.fees.n || 1) < 0.05 ? "good" : f.fees.arrears / (f.fees.n || 1) < 0.1 ? "warn" : "bad",
+        },
+        {
+            label: "Budget variance",
+            value: signedPct(f.budget.varPct),
+            note: `${f.overBudget.length} lines over budget`,
+            tone: varianceTone(f.budget.varPct),
+            trend: f.monthly.map((m) => Number(m.actualCum) - Number(m.budgetCum)),
+        },
+    ],
 }
 
 export function ExecutiveOverviewScreen() {
     const { data: eduData } = useEduData()
     const { data: hrData } = useHrData()
+    const { data: finData } = useFinData()
     const all = useMemo(() => {
-        if (!eduData || !hrData) return null
+        if (!eduData || !hrData || !finData) return null
         const edu = analyseEdu(eduData, DEFAULT_EDU_FILTERS)
         const hr = analyseHr(hrData, DEFAULT_HR_FILTERS)
+        const fin = analyseFin(finData, DEFAULT_FIN_FILTERS)
         const schools = SCHOOLS.map((s) => {
             const e = analyseEdu(eduData, { ...DEFAULT_EDU_FILTERS, school: s.id })
             const h = analyseHr(hrData, { ...DEFAULT_HR_FILTERS, location: s.id })
-            return { s, e, h }
+            const fn = analyseFin(finData, { ...DEFAULT_FIN_FILTERS, location: s.id })
+            return { s, e, h, fn }
         })
-        return { edu, hr, schools }
-    }, [eduData, hrData])
+        return { edu, hr, fin, schools }
+    }, [eduData, hrData, finData])
 
     return (
         <>
@@ -102,9 +136,9 @@ export function ExecutiveOverviewScreen() {
                 <ScreenSkeleton />
             ) : (
                 <div className="space-y-4">
-                    <div className="grid gap-4 xl:grid-cols-2">
+                    <div className="grid gap-4 xl:grid-cols-3">
                         {PLATFORMS.filter((p) => p.status === "live").map((p) => (
-                            <PlatformStrip key={p.code} p={p} items={HEADLINES[p.code]?.(all.edu, all.hr) ?? []} />
+                            <PlatformStrip key={p.code} p={p} items={HEADLINES[p.code]?.(all.edu, all.hr, all.fin) ?? []} />
                         ))}
                     </div>
                     <Grid>
@@ -135,13 +169,13 @@ export function ExecutiveOverviewScreen() {
                                 titlePrefix="Week of "
                             />
                         </Panel>
-                        <Alerts edu={all.edu} hr={all.hr} />
-                        <Panel span={12} title="School comparison" subtitle="Students and staff side by side for each school">
+                        <Alerts edu={all.edu} hr={all.hr} fin={all.fin} />
+                        <Panel span={12} title="School comparison" subtitle="Students, staff and finances side by side for each school">
                             <div className="-mx-1 overflow-x-auto px-1">
-                                <table className="w-full min-w-[860px] border-separate border-spacing-y-1 text-[13px]">
+                                <table className="w-full min-w-[1180px] border-separate border-spacing-y-1 text-[13px]">
                                     <thead>
                                         <tr className="text-muted text-[10.5px] font-bold tracking-[.12em] uppercase">
-                                            <th className="px-3 pb-1.5 text-left">School</th>
+                                            <th className="min-w-[210px] px-3 pb-1.5 text-left">School</th>
                                             <th className="px-3 pb-1.5 text-right">Students</th>
                                             <th className="px-3 pb-1.5 text-right">Student attendance</th>
                                             <th className="px-3 pb-1.5 text-right">Students at risk</th>
@@ -150,10 +184,13 @@ export function ExecutiveOverviewScreen() {
                                             <th className="px-3 pb-1.5 text-right">Staff attendance</th>
                                             <th className="px-3 pb-1.5 text-right">Avg appraisal</th>
                                             <th className="px-3 pb-1.5 text-right">Students / teacher</th>
+                                            <th className="px-3 pb-1.5 text-right">Fee collection</th>
+                                            <th className="px-3 pb-1.5 text-right">Outstanding</th>
+                                            <th className="px-3 pb-1.5 text-right">Budget variance</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {all.schools.map(({ s, e, h }) => {
+                                        {all.schools.map(({ s, e, h, fn }) => {
                                             const net = e.n ? (e.totals.ACH - e.totals.INC) / e.n : 0
                                             const cells = [
                                                 fmt(e.n),
@@ -181,6 +218,15 @@ export function ExecutiveOverviewScreen() {
                                                 <span key="t" className="tabular text-ink-2">
                                                     {h.teaching ? (e.n / h.teaching).toFixed(1) : "–"}
                                                 </span>,
+                                                <Pill key="f" tone={collectionTone(fn.fees.rate)}>
+                                                    {pct(fn.fees.rate)}
+                                                </Pill>,
+                                                <span key="o" className="tabular text-ink-2">
+                                                    {qar(fn.fees.outstanding)}
+                                                </span>,
+                                                <Pill key="b" tone={varianceTone(fn.budget.varPct)}>
+                                                    {signedPct(fn.budget.varPct)}
+                                                </Pill>,
                                             ]
                                             return (
                                                 <tr key={s.id} className="group">
@@ -238,7 +284,7 @@ function PlatformStrip({ p, items }: { p: PlatformDefinition; items: Headline[] 
                     Open <ArrowUpRight className="size-3.5" />
                 </Link>
             </header>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-2">
                 {items.map((it) => (
                     <div key={it.label} className="bg-surface-2 rounded-xl p-3">
                         <div className="text-ink-2 truncate text-[11.5px] font-semibold">{it.label}</div>
@@ -261,11 +307,11 @@ function PlatformStrip({ p, items }: { p: PlatformDefinition; items: Headline[] 
     )
 }
 
-function Alerts({ edu, hr }: { edu: EduAnalysis; hr: HrAnalysis }) {
+function Alerts({ edu, hr, fin }: { edu: EduAnalysis; hr: HrAnalysis; fin: FinAnalysis }) {
     const students = edu.list
         .filter((s) => s.m.status === "bad")
         .sort((a, b) => a.m.att - b.m.att)
-        .slice(0, 4)
+        .slice(0, 3)
         .map((s) => ({
             id: s.id,
             name: s.name,
@@ -277,7 +323,7 @@ function Alerts({ edu, hr }: { edu: EduAnalysis; hr: HrAnalysis }) {
     const staff = hr.list
         .filter((e) => e.m.status === "bad")
         .sort((a, b) => a.m.att - b.m.att)
-        .slice(0, 4)
+        .slice(0, 3)
         .map((e) => ({
             id: 100000 + e.id,
             name: e.name,
@@ -286,12 +332,29 @@ function Alerts({ edu, hr }: { edu: EduAnalysis; hr: HrAnalysis }) {
             reason: e.m.att < 90 ? "Low attendance" : "Low appraisal",
             href: `/hr/staff/${e.id}`,
         }))
+    const accounts = fin.list
+        .filter((a) => a.m.status === "arrears")
+        .sort((a, b) => b.m.overdue - a.m.overdue)
+        .slice(0, 3)
+        .map((a) => ({
+            id: 200000 + a.id,
+            name: a.name,
+            meta: `Fee account · ${secName(a.yg, a.sec)} · ${schoolOf(a.school).short}`,
+            value: money(a.m.overdue),
+            reason: a.m.daysOverdue > 90 ? "90+ days overdue" : a.m.prior >= 1 ? "Prior term unpaid" : `${a.m.daysOverdue} days overdue`,
+            href: `/fin/accounts/${a.id}`,
+        }))
     return (
-        <Panel span={4} title="Alerts" subtitle={`${fmt(edu.totals.atRisk)} students and ${fmt(hr.atRisk)} staff flagged at risk`}>
+        <Panel
+            span={4}
+            title="Alerts"
+            subtitle={`${fmt(edu.totals.atRisk)} students, ${fmt(hr.atRisk)} staff and ${fmt(fin.fees.arrears)} fee accounts flagged`}
+        >
             <div className="space-y-4">
                 {[
                     { label: "Students", items: students, more: "/edu/students" },
                     { label: "Staff", items: staff, more: "/hr/staff" },
+                    { label: "Fee accounts", items: accounts, more: "/fin/accounts" },
                 ].map((g) => (
                     <div key={g.label}>
                         <div className="mb-1.5 flex items-center justify-between">
