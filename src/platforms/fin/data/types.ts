@@ -1,3 +1,4 @@
+import type { InsightsMeta } from "@/lib/insights"
 import type { Stage } from "@/platforms/edu/data/constants"
 import type { DiscountId, PayerProfile, PaymentMethod, StreamCode } from "./constants"
 
@@ -26,7 +27,7 @@ export interface Invoice {
 
 /** One fee account per EDU student (same id), denormalised like the HR records. */
 export interface FeeAccount {
-    id: number
+    id: string
     name: string
     school: string
     stage: Stage
@@ -40,7 +41,7 @@ export interface FeeAccount {
 
 /** Monthly payroll for one HR employee (same id). */
 export interface PayrollRecord {
-    id: number
+    id: string
     name: string
     role: string
     location: string
@@ -79,4 +80,5 @@ export interface FinDataset {
     income: IncomeLine[]
     /** group cash at 1 Jan 2026 */
     openingCash: number
+    meta: InsightsMeta
 }

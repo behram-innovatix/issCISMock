@@ -76,7 +76,10 @@ export function LoginScreen({ next }: { next?: string }) {
                         />
 
                         {state.error && !pending && (
-                            <div role="alert" className="animate-fade bg-bad-soft text-bad-ink flex items-start gap-2 rounded-xl px-3.5 py-2.5 text-[12.5px] font-semibold">
+                            <div
+                                role="alert"
+                                className="animate-fade bg-bad-soft text-bad-ink flex items-start gap-2 rounded-xl px-3.5 py-2.5 text-[12.5px] font-semibold"
+                            >
                                 <AlertCircle className="mt-px size-4 shrink-0" />
                                 {state.error}
                             </div>
@@ -102,7 +105,8 @@ export function LoginScreen({ next }: { next?: string }) {
                             <span className="bg-line h-px flex-1" />
                         </div>
                         <p className="text-muted mt-2.5 text-center text-[11.5px]">
-                            Select a role to fill in its credentials · password <span className="text-ink-2 tabular font-semibold">{DEMO_PASSWORD}</span>
+                            Select a role to fill in its credentials · password{" "}
+                            <span className="text-ink-2 tabular font-semibold">{DEMO_PASSWORD}</span>
                         </p>
                         <div className="mt-3.5 grid gap-2.5 sm:grid-cols-2">
                             {DEMO_ACCOUNTS.map((a) => {
@@ -120,7 +124,9 @@ export function LoginScreen({ next }: { next?: string }) {
                                         aria-pressed={on}
                                         className={cn(
                                             "group rounded-2xl border p-3.5 text-left transition-all duration-200 hover:-translate-y-0.5",
-                                            on ? "border-primary/40 bg-primary-soft/60 ring-primary/10 ring-4" : "border-line bg-surface hover:border-line-strong shadow-card",
+                                            on
+                                                ? "border-primary/40 bg-primary-soft/60 ring-primary/10 ring-4"
+                                                : "border-line bg-surface hover:border-line-strong shadow-card",
                                         )}
                                     >
                                         <div className="flex items-center gap-2.5">
@@ -189,7 +195,10 @@ function BrandPanel() {
                         const Icon = p.icon
                         const live = p.status === "live"
                         return (
-                            <li key={p.code} className="flex items-center gap-3 rounded-xl bg-white/10 px-3.5 py-2.5 ring-1 ring-white/15 backdrop-blur-sm">
+                            <li
+                                key={p.code}
+                                className="flex items-center gap-3 rounded-xl bg-white/10 px-3.5 py-2.5 ring-1 ring-white/15 backdrop-blur-sm"
+                            >
                                 <span className="flex size-8 items-center justify-center rounded-lg bg-white/15 text-white">
                                     <Icon className="size-4" />
                                 </span>
@@ -200,7 +209,7 @@ function BrandPanel() {
                                 <span
                                     className={cn(
                                         "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase",
-                                        live ? "bg-white text-primary" : "bg-white/15 text-white/80",
+                                        live ? "text-primary bg-white" : "bg-white/15 text-white/80",
                                     )}
                                 >
                                     {live ? "Live" : "Soon"}

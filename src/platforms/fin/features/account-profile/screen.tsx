@@ -6,7 +6,7 @@ import { Meter } from "@/components/ui/meter"
 import { Empty, Grid, Note, Panel } from "@/components/ui/panel"
 import { Pill } from "@/components/ui/pill"
 import { ScreenSkeleton } from "@/components/ui/skeleton"
-import { AS_OF } from "@/lib/data-source"
+import { AS_OF } from "@/lib/calendar"
 import { money, pct, ratio, shortDate } from "@/lib/format"
 import { schoolOf, secName, ygName } from "@/platforms/edu/data/constants"
 import { ArrowLeft, ArrowUpRight, BadgePercent, CalendarClock, CircleDollarSign, HandCoins, Receipt } from "lucide-react"
@@ -16,7 +16,7 @@ import { ACCOUNT_STATUS, collectionTone } from "../../components/widgets"
 import { discountOf, PAYER_LABEL, termOf } from "../../data/constants"
 import { useFinData } from "../../hooks"
 
-export function AccountProfileScreen({ id }: { id: number }) {
+export function AccountProfileScreen({ id }: { id: string }) {
     const { data } = useFinData()
     if (!data) return <ScreenSkeleton />
     const acc = data.accounts.find((x) => x.id === id)

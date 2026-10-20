@@ -33,10 +33,10 @@ const COLUMNS: Column<ScoredStudent>[] = [
     {
         key: "yg",
         header: "Year · Section",
-        sort: (s) => YG_ORDER[s.yg] * 10 + s.sec.charCodeAt(0),
+        sort: (s) => `${String(YG_ORDER[s.yg] ?? 99).padStart(2, "0")} ${secName(s.yg, s.sec)}`,
         render: (s) => <span className="text-ink-2 font-semibold">{secName(s.yg, s.sec)}</span>,
     },
-    { key: "house", header: "House", sort: (s) => s.house, render: (s) => <span className="text-ink-2">{s.house}</span> },
+    { key: "house", header: "House", sort: (s) => s.house ?? "", render: (s) => <span className="text-ink-2">{s.house ?? "—"}</span> },
     {
         key: "att",
         header: "Attendance",
@@ -109,7 +109,7 @@ export function EduStudentsScreen() {
                         (!q ||
                             s.name.toLowerCase().includes(q) ||
                             secName(s.yg, s.sec).toLowerCase().includes(q) ||
-                            s.house.toLowerCase().includes(q)) &&
+                            (s.house ?? "").toLowerCase().includes(q)) &&
                         (reg.status === "all" || s.m.status === reg.status) &&
                         (!reg.cell || (attBand(s.m) === reg.cell.ai && behBand(s.m) === reg.cell.bi)),
                 )

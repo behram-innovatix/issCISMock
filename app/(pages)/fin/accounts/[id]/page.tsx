@@ -5,5 +5,5 @@ export const metadata: Metadata = { title: "Fee account" }
 
 export default async function Page({ params }: PageProps<"/fin/accounts/[id]">) {
     const { id } = await params
-    return <AccountProfileScreen id={Number(id)} />
+    return <AccountProfileScreen id={decodeURIComponent(id)} />
 }

@@ -10,8 +10,12 @@ const TINTS = [
     ["#e6f5ee", "#157a50"],
 ]
 
-export function Avatar({ name, seed = 0, size = "md" }: { name: string; seed?: number; size?: "sm" | "md" | "lg" }) {
-    const [bg, fg] = TINTS[seed % TINTS.length]
+/** Stable tint index for any id (numbers or strings such as GUIDs). */
+const tintOf = (seed: number | string) =>
+    typeof seed === "number" ? seed : [...seed].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7)
+
+export function Avatar({ name, seed = 0, size = "md" }: { name: string; seed?: number | string; size?: "sm" | "md" | "lg" }) {
+    const [bg, fg] = TINTS[tintOf(seed) % TINTS.length]
     return (
         <span
             aria-hidden

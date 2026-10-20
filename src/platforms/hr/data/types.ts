@@ -1,3 +1,4 @@
+import type { InsightsMeta } from "@/lib/insights"
 import type { Gender } from "@/platforms/edu/data/types"
 import type { LeaveType } from "./constants"
 
@@ -10,7 +11,7 @@ export interface Appraisal {
     /** 1–5 per competency, present once the manager has scored it */
     scores?: number[]
     overall?: number
-    reviewerId?: number
+    reviewerId?: string
 }
 
 export interface EmployeeKpi {
@@ -30,7 +31,7 @@ export interface LeaveRequest {
 }
 
 export interface Employee {
-    id: number
+    id: string
     name: string
     gender: Gender
     location: string
@@ -40,7 +41,7 @@ export interface Employee {
     grade: string
     nat: string
     hireDate: Date
-    managerId?: number
+    managerId?: string
     /** HR day-code index per working day (NW × 5) */
     days: Uint8Array
     /** minutes late on late days */
@@ -58,4 +59,5 @@ export interface Employee {
 
 export interface HrDataset {
     employees: Employee[]
+    meta: InsightsMeta
 }

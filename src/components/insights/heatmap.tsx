@@ -15,8 +15,8 @@ export function Heatmap({
 }: {
     rows: readonly string[]
     cols: readonly string[]
-    /** values[col][row] */
-    values: number[][]
+    /** values[col][row]; null for a day without data (a holiday) */
+    values: (number | null)[][]
     color: (v: number) => string
     format: (v: number) => string
     tip: (row: number, col: number, v: number) => ReactNode
@@ -33,6 +33,16 @@ export function Heatmap({
                 <Row key={r} label={r}>
                     {cols.map((c, ci) => {
                         const v = values[ci][ri]
+                        if (v === null)
+                            return (
+                                <div
+                                    key={c}
+                                    className="bg-bg-2 text-muted flex h-9 items-center justify-center rounded-lg text-[11px] font-semibold"
+                                    title="No school or no marks"
+                                >
+                                    –
+                                </div>
+                            )
                         return (
                             <Tip key={c} content={tip(ri, ci, v)}>
                                 <div

@@ -18,7 +18,7 @@ export interface AspectRow {
 }
 
 export type ValueIndex = Map<string, AssessmentValue>
-export const valueKey = (studentId: number, resultSet: string, aspect: string) => `${studentId}|${resultSet}|${aspect}`
+export const valueKey = (studentId: string, resultSet: string, aspect: string) => `${studentId}|${resultSet}|${aspect}`
 export const indexValues = (values: AssessmentValue[]): ValueIndex =>
     new Map(values.map((v) => [valueKey(v.studentId, v.resultSet, v.aspect), v]))
 
@@ -39,7 +39,17 @@ export function bandOf(bands: GradeBand[], v: AssessmentValue): GradeBand | null
 /** Tally one aspect for a set of students; null when none of them records it. */
 export function tallyAspect(students: Student[], idx: ValueIndex, an: AspectAnalysis, aspect: string): AspectRow | null {
     const bands = bandsOf(an)
-    const row: AspectRow = { aspect, expected: 0, banded: 0, missing: 0, invalid: 0, unbanded: 0, meets: 0, bands: bands.map(() => 0), meetsShare: null }
+    const row: AspectRow = {
+        aspect,
+        expected: 0,
+        banded: 0,
+        missing: 0,
+        invalid: 0,
+        unbanded: 0,
+        meets: 0,
+        bands: bands.map(() => 0),
+        meetsShare: null,
+    }
     for (const st of students) {
         if (!inAnalysis(an, st)) continue
         const v = idx.get(valueKey(st.id, an.resultSet, aspect))
@@ -94,7 +104,15 @@ export function childLevel(f: EduFilters): GroupLevel {
 
 export function childGroups(students: Student[], level: GroupLevel): Group[] {
     const keyOf = (s: Student) =>
-        level === "school" ? s.school : level === "stage" ? s.stage : level === "year group" ? s.yg : level === "section" ? s.sec : String(s.id)
+        level === "school"
+            ? s.school
+            : level === "stage"
+              ? s.stage
+              : level === "year group"
+                ? s.yg
+                : level === "section"
+                  ? s.sec
+                  : String(s.id)
     const map = new Map<string, Group>()
     for (const s of students) {
         const k = keyOf(s)

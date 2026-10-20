@@ -5,5 +5,5 @@ export const metadata: Metadata = { title: "Student profile" }
 
 export default async function Page({ params }: PageProps<"/edu/students/[id]">) {
     const { id } = await params
-    return <StudentProfileScreen id={Number(id)} />
+    return <StudentProfileScreen id={decodeURIComponent(id)} />
 }

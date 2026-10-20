@@ -70,7 +70,7 @@ export function PointsBalance({ a, height = 260 }: { a: EduAnalysis; height?: nu
     )
 }
 
-export const studentMeta = (st: ScoredStudent) => `${secName(st.yg, st.sec)} · ${st.house} · ${schoolOf(st.school).short}`
+export const studentMeta = (st: ScoredStudent) => [secName(st.yg, st.sec), st.house, schoolOf(st.school).short].filter(Boolean).join(" · ")
 
 export const studentItem = (st: ScoredStudent, value: string, tone: LeaderItem["tone"]): LeaderItem => ({
     id: st.id,
@@ -83,7 +83,7 @@ export const studentItem = (st: ScoredStudent, value: string, tone: LeaderItem["
 
 export function CodeRows({ counts, limit = 8 }: { counts: number[]; limit?: number }) {
     const rows = CODES.map((c, i) => ({ c, v: counts[i] }))
-        .filter((x) => x.c[2] !== "present" && x.v > 0)
+        .filter((x) => x.c[2] !== "present" && x.c[2] !== "none" && x.v > 0)
         .sort((a, b) => b.v - a.v)
         .slice(0, limit)
     if (!rows.length) return <Empty>No absences or lates recorded.</Empty>

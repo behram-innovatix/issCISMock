@@ -1,11 +1,12 @@
 import { dateOf, NW } from "@/lib/calendar"
 import { avg } from "@/lib/format"
-import { makeRandom } from "@/lib/seed"
 import { sectionOutcomes } from "@/platforms/edu/analytics"
-import { FIRST_F, FIRST_M, LAST, schoolOf, SCHOOLS } from "@/platforms/edu/data/constants"
-import type { EduDataset, Gender, Section } from "@/platforms/edu/data/types"
-import { COMPETENCIES, CYCLES, DEPARTMENTS, HR_CODES, LEAVE_TYPES, PRIMARY_SPECIALISTS, SECONDARY_SUBJECTS } from "./constants"
-import type { Appraisal, AppraisalStatus, Employee, EmployeeKpi, LeaveRequest } from "./types"
+import type { Gender, Section } from "@/platforms/edu/data/types"
+import { COMPETENCIES, CYCLES, DEPARTMENTS, PRIMARY_SPECIALISTS, SECONDARY_SUBJECTS } from "@/platforms/hr/data/constants"
+import type { Appraisal, AppraisalStatus, Employee, EmployeeKpi, LeaveRequest } from "@/platforms/hr/data/types"
+import type { MockEdu } from "../edu/generate"
+import { FIRST_F, FIRST_M, LAST, SCHOOLS } from "../edu/vocab"
+import { makeRandom } from "../seed"
 
 export const HR_SEED = 20261014
 
@@ -67,10 +68,10 @@ const HQ_STAFF: [string, string, number][] = [
  *  - behaviour events are re-attributed to a teacher of the student's section
  *  - appraisal scores lean on the teacher's real class outcomes, so Teacher Impact shows a genuine link
  */
-export function generateHr(edu: EduDataset): Employee[] {
+export function generateHr(edu: MockEdu): Employee[] {
     const { R, pick, between, weighted } = makeRandom(HR_SEED)
     const employees: Employee[] = []
-    const absBaseOf = new Map<number, number>()
+    const absBaseOf = new Map<string, number>()
 
     const make = (location: string, dept: string, role: string, gender?: Gender): Employee => {
         const g: Gender =
@@ -94,7 +95,7 @@ export function generateHr(edu: EduDataset): Employee[] {
         const hireDate = new Date(year, year === 2026 ? 7 : Math.floor(R() * 12), 1 + Math.floor(R() * 26))
         const lead = role.startsWith("Principal") || role.startsWith("Chief") || role.startsWith("Director") || role.endsWith("Manager")
         const e: Employee = {
-            id: employees.length + 1,
+            id: String(employees.length + 1),
             name,
             gender: g,
             location,
@@ -160,7 +161,7 @@ export function generateHr(edu: EduDataset): Employee[] {
         } else if (e.role === "Principal") e.managerId = employees.find((m) => m.role === "Director of Education")!.id
         else {
             const vps = employees.filter((m) => m.location === e.location && m.role === "Vice Principal")
-            e.managerId = e.teaching && vps.length ? vps[e.id % vps.length].id : principal(e.location)!.id
+            e.managerId = e.teaching && vps.length ? vps[Number(e.id) % vps.length].id : principal(e.location)!.id
         }
     }
 
@@ -373,7 +374,3 @@ export function generateHr(edu: EduDataset): Employee[] {
 
     return employees
 }
-
-export const HR_CODE_INDEX = Object.fromEntries(HR_CODES.map((c, i) => [c[0], i]))
-export const LEAVE_INDEX = Object.fromEntries(LEAVE_TYPES.map((t, i) => [t, i]))
-export const schoolName = (id: string) => (id === "HQ" ? "Group Head Office" : schoolOf(id).name)

@@ -3,6 +3,7 @@
 import { Donut, TrendChart } from "@/components/charts/charts"
 import { Kpi, KpiGrid, Neg, Pos } from "@/components/insights/kpi"
 import { Legend } from "@/components/insights/legend"
+import { NotConnected } from "@/components/insights/not-connected"
 import { TermCalendar } from "@/components/insights/term-calendar"
 import { Avatar } from "@/components/ui/avatar"
 import { Empty, Grid, Panel } from "@/components/ui/panel"
@@ -11,20 +12,22 @@ import { ScreenSkeleton } from "@/components/ui/skeleton"
 import { dateOf, periodLong, WEEKS } from "@/lib/calendar"
 import { dateLabel, fmt, pct, signed } from "@/lib/format"
 import { STATUS_LABEL, statusOf } from "@/lib/status"
-import { useStaffIndex } from "@/platforms/hr/hooks"
+import { useEmployeeIndex } from "@/platforms/hr/hooks"
 import { ArrowLeft, CalendarCheck, CheckCircle2, Clock, FileCheck2, FileX2, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { metricsFor, sectionAverageWeeks, studentWeeks } from "../../analytics"
 import { CodeRows, MIX } from "../../components/widgets"
 import { BTYPES, CAT, CAT_COLOR, CAT_LABEL, CODES, schoolOf, secName, SPW, ygName } from "../../data/constants"
-import { useEduData } from "../../hooks"
+import { useEduData, useStaffIndex } from "../../hooks"
 import { useEdu } from "../../state"
 
-export function StudentProfileScreen({ id }: { id: number }) {
+export function StudentProfileScreen({ id }: { id: string }) {
     const { data } = useEduData()
     const w0 = useEdu((s) => s.filters.w0)
     const staff = useStaffIndex()
+    const employees = useEmployeeIndex()
     if (!data) return <ScreenSkeleton />
+    if (!data.meta.connected) return <NotConnected name="EDU" meta={data.meta} />
     const st = data.students.find((s) => s.id === id)
     if (!st)
         return (
@@ -37,8 +40,8 @@ export function StudentProfileScreen({ id }: { id: number }) {
         )
 
     const m = metricsFor(st, w0)
-    const section = data.sections.find((x) => x.key === st.key)!
-    const tutor = staff.get(section.formTutorId)
+    const section = data.sections.find((x) => x.key === st.key)
+    const tutor = section?.formTutorId ? staff.get(section.formTutorId) : undefined
     const mine = studentWeeks(st, w0)
     const avg = sectionAverageWeeks(data, st.key, w0)
     const counts = new Array(CODES.length).fill(0)
@@ -68,19 +71,24 @@ export function StudentProfileScreen({ id }: { id: number }) {
                             schoolOf(st.school).name,
                             `${ygName(st.yg)} · ${secName(st.yg, st.sec)}`,
                             st.stage,
-                            `${st.house} house`,
+                            st.house && `${st.house} house`,
                             st.nat,
                             st.gender === "M" ? "Boy" : "Girl",
-                        ].map((c) => (
-                            <Pill key={c}>{c}</Pill>
-                        ))}
-                        {tutor && (
-                            <Link href={`/hr/staff/${tutor.id}`}>
-                                <Pill tone="info" className="hover:bg-primary/15 transition-colors">
-                                    Form tutor: {tutor.name}
-                                </Pill>
-                            </Link>
-                        )}
+                        ]
+                            .filter((c): c is string => !!c)
+                            .map((c) => (
+                                <Pill key={c}>{c}</Pill>
+                            ))}
+                        {tutor &&
+                            (employees.has(tutor.id) ? (
+                                <Link href={`/hr/staff/${tutor.id}`}>
+                                    <Pill tone="info" className="hover:bg-primary/15 transition-colors">
+                                        Form tutor: {tutor.name}
+                                    </Pill>
+                                </Link>
+                            ) : (
+                                <Pill tone="info">Form tutor: {tutor.name}</Pill>
+                            ))}
                     </div>
                 </div>
                 <div className="text-muted text-right text-[11.5px]">{periodLong(w0)}</div>
@@ -194,7 +202,7 @@ export function StudentProfileScreen({ id }: { id: number }) {
                     ) : (
                         <ol className="before:bg-line-strong relative space-y-3 before:absolute before:top-2 before:bottom-2 before:left-[5px] before:w-px">
                             {events.map((e, i) => {
-                                const by = staff.get(e.byStaffId)
+                                const by = e.byStaffId ? staff.get(e.byStaffId) : undefined
                                 return (
                                     <li key={i} className="relative pl-6">
                                         <i
@@ -202,19 +210,23 @@ export function StudentProfileScreen({ id }: { id: number }) {
                                         />
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="min-w-0">
-                                                <div className="text-ink text-[13px] font-semibold">{BTYPES[e.t].n}</div>
+                                                <div className="text-ink text-[13px] font-semibold">{BTYPES[e.t]?.n ?? "Behaviour"}</div>
                                                 <div className="text-muted text-[11.5px]">
                                                     {dateLabel(dateOf(e.w, e.d))}
                                                     {e.loc && ` · ${e.loc}`}
                                                     {by && (
                                                         <>
                                                             {" · recorded by "}
-                                                            <Link
-                                                                href={`/hr/staff/${by.id}`}
-                                                                className="text-ink-2 hover:text-primary font-semibold hover:underline"
-                                                            >
-                                                                {by.name}
-                                                            </Link>
+                                                            {employees.has(by.id) ? (
+                                                                <Link
+                                                                    href={`/hr/staff/${by.id}`}
+                                                                    className="text-ink-2 hover:text-primary font-semibold hover:underline"
+                                                                >
+                                                                    {by.name}
+                                                                </Link>
+                                                            ) : (
+                                                                <span className="text-ink-2 font-semibold">{by.name}</span>
+                                                            )}
                                                         </>
                                                     )}
                                                 </div>

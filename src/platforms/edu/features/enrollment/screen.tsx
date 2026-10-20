@@ -1,6 +1,6 @@
 "use client"
 
-import { BarsChart, Donut, TrendChart } from "@/components/charts/charts"
+import { BarsChart, Donut } from "@/components/charts/charts"
 import { Kpi, KpiGrid } from "@/components/insights/kpi"
 import { Legend } from "@/components/insights/legend"
 import { Empty, Grid, Panel } from "@/components/ui/panel"
@@ -8,7 +8,7 @@ import { Tip } from "@/components/ui/tip"
 import { fmt, pct } from "@/lib/format"
 import { Armchair, CheckCircle2, User, UserRound, Users } from "lucide-react"
 import { EduPage } from "../../components/edu-page"
-import { schoolOf, secName, YG_ORDER, ygShort } from "../../data/constants"
+import { SCHOOLS, schoolOf, secName, YG_ORDER, ygShort } from "../../data/constants"
 import type { Section } from "../../data/types"
 import { useEdu } from "../../state"
 
@@ -54,15 +54,15 @@ export function EduEnrollmentScreen() {
                                 label="Seats available"
                                 icon={<Armchair />}
                                 color="var(--c2)"
-                                value={fmt(Math.max(a.cap - a.n, 0))}
-                                foot={<span>of {fmt(a.cap)} capacity</span>}
+                                value={a.cap ? fmt(Math.max(a.cap - a.n, 0)) : "—"}
+                                foot={<span>{a.cap ? `of ${fmt(a.cap)} capacity` : "Capacity not recorded"}</span>}
                             />
                             <Kpi
                                 label="Full sections"
                                 icon={<CheckCircle2 />}
                                 color="var(--good)"
-                                value={fmt(a.fullSecs)}
-                                foot={<span>at 100% capacity</span>}
+                                value={a.cap ? fmt(a.fullSecs) : "—"}
+                                foot={<span>{a.cap ? "at 100% capacity" : "Capacity not recorded"}</span>}
                             />
                         </KpiGrid>
                         <Grid>
@@ -110,7 +110,11 @@ export function EduEnrollmentScreen() {
                             <Panel
                                 span={5}
                                 title="Section capacity"
-                                subtitle="Enrolled ÷ capacity · ≥90% green, 75–89% amber, under 75% red"
+                                subtitle={
+                                    a.cap
+                                        ? "Enrolled ÷ capacity · ≥90% green, 75–89% amber, under 75% red"
+                                        : "Students enrolled per section (the source doesn’t record capacity)"
+                                }
                                 bodyClassName="max-h-[352px] overflow-y-auto pr-1"
                             >
                                 {Object.keys(capRows).length === 0 ? (
@@ -118,7 +122,7 @@ export function EduEnrollmentScreen() {
                                 ) : (
                                     <div className="space-y-2.5">
                                         {Object.keys(capRows)
-                                            .sort((x, y) => YG_ORDER[x] - YG_ORDER[y])
+                                            .sort((x, y) => (YG_ORDER[x] ?? 99) - (YG_ORDER[y] ?? 99))
                                             .map((yg) => (
                                                 <div key={yg} className="flex gap-3">
                                                     <div className="text-ink-2 w-8 shrink-0 pt-2 text-[11.5px] font-bold">
@@ -127,8 +131,15 @@ export function EduEnrollmentScreen() {
                                                     <div className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(98px,1fr))] gap-1.5">
                                                         {capRows[yg].map((x) => {
                                                             const e = a.enrolledByKey[x.key] || 0
-                                                            const fill = (e / x.cap) * 100
-                                                            const c = fill >= 90 ? "var(--good)" : fill >= 75 ? "var(--warn)" : "var(--bad)"
+                                                            const fill = x.cap ? (e / x.cap) * 100 : null
+                                                            const c =
+                                                                fill === null
+                                                                    ? "var(--c1)"
+                                                                    : fill >= 90
+                                                                      ? "var(--good)"
+                                                                      : fill >= 75
+                                                                        ? "var(--warn)"
+                                                                        : "var(--bad)"
                                                             const lbl =
                                                                 f.school === "all"
                                                                     ? `${schoolAbbr(x.school)} · ${secName(x.yg, x.sec)}`
@@ -136,19 +147,26 @@ export function EduEnrollmentScreen() {
                                                             return (
                                                                 <Tip
                                                                     key={x.key}
-                                                                    content={`${schoolOf(x.school).name}\nSection ${secName(x.yg, x.sec)}\n${e} of ${x.cap} seats filled\n${pct(fill, 0)} capacity used`}
+                                                                    content={
+                                                                        fill === null
+                                                                            ? `${schoolOf(x.school).name}\nSection ${secName(x.yg, x.sec)}\n${e} students enrolled`
+                                                                            : `${schoolOf(x.school).name}\nSection ${secName(x.yg, x.sec)}\n${e} of ${x.cap} seats filled\n${pct(fill, 0)} capacity used`
+                                                                    }
                                                                 >
                                                                     <div className="border-line bg-surface-2 hover:border-line-strong rounded-lg border px-2 py-1.5 transition-colors">
                                                                         <div className="flex items-center justify-between gap-1 text-[10.5px]">
                                                                             <span className="text-ink-2 truncate font-semibold">{lbl}</span>
                                                                             <em className="tabular text-muted font-semibold not-italic">
-                                                                                {e}/{x.cap}
+                                                                                {x.cap ? `${e}/${x.cap}` : e}
                                                                             </em>
                                                                         </div>
                                                                         <div className="bg-bg-2 mt-1 h-1 overflow-hidden rounded-full">
                                                                             <i
                                                                                 className="block h-full rounded-full"
-                                                                                style={{ width: `${Math.min(fill, 100)}%`, background: c }}
+                                                                                style={{
+                                                                                    width: `${fill === null ? (e ? 100 : 0) : Math.min(fill, 100)}%`,
+                                                                                    background: c,
+                                                                                }}
                                                                             />
                                                                         </div>
                                                                     </div>
@@ -161,15 +179,16 @@ export function EduEnrollmentScreen() {
                                     </div>
                                 )}
                             </Panel>
-                            <Panel span={4} title="Enrollment trend" subtitle="Students on roll, by academic year (illustrative history)">
-                                <TrendChart
+                            <Panel span={4} title="Students by school" subtitle="On roll in the current filter">
+                                <BarsChart
                                     height={340}
-                                    data={["2022–23", "2023–24", "2024–25", "2025–26", "2026–27"].map((label, i) => ({
-                                        label,
-                                        n: Math.round(a.n * [0.81, 0.87, 0.92, 0.97, 1][i]),
-                                    }))}
-                                    series={[{ key: "n", label: "Students", color: "var(--c2)", fill: true }]}
-                                    yFormat={(v) => fmt(v)}
+                                    data={SCHOOLS.map((s) => ({
+                                        name: s.short,
+                                        v: a.list.filter((st) => st.school === s.id).length,
+                                    })).filter((x) => x.v > 0)}
+                                    xKey="name"
+                                    series={[{ key: "v", label: "Students", color: "var(--c2)" }]}
+                                    valueFormat={(v) => `${fmt(v)} students`}
                                 />
                             </Panel>
                             <Panel span={3} title="Nationality mix" subtitle="Top 7 nationalities">

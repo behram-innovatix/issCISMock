@@ -2,7 +2,7 @@
 // Student Performance dashboard (aspects, result_sets, grade_pattern_elements,
 // aspect_pattern_elements, aspect_analyses). Year groups are mapped onto the CIS schools.
 // Results use their own seed so the EDU generator's RNG stream (and its numbers) is untouched.
-import { makeRandom } from "@/lib/seed"
+import { makeRandom } from "@/mock/seed"
 import { metricsFor } from "../analytics"
 import type { Student } from "./types"
 
@@ -50,7 +50,7 @@ export interface AspectAnalysis {
 export type ValueStatus = "valid" | "missing" | "invalid"
 
 export interface AssessmentValue {
-    studentId: number
+    studentId: string
     resultSet: string
     aspect: string
     raw: string
@@ -97,9 +97,7 @@ export const GRADE_PATTERNS: Record<string, GradeBand[]> = {
         order: i + 1,
         meets: i >= 2,
     })),
-    "Attainment 9-1": nb(
-        ["U", "1", "2", "3", "4", "5", "6", "7", "8", "9"].map((g, i) => [g, i * 10, i === 9 ? 100 : i * 10 + 9, i >= 4]),
-    ),
+    "Attainment 9-1": nb(["U", "1", "2", "3", "4", "5", "6", "7", "8", "9"].map((g, i) => [g, i * 10, i === 9 ? 100 : i * 10 + 9, i >= 4])),
 }
 
 export const ASPECT_PATTERNS: Record<string, string[]> = {
@@ -109,10 +107,42 @@ export const ASPECT_PATTERNS: Record<string, string[]> = {
 }
 
 export const ASPECT_ANALYSES: AspectAnalysis[] = [
-    { id: "AA-01", name: "Core Attainment Analysis", resultSet: "MT", gradePattern: "Attainment bands", aspectPattern: "Core Subjects", years: null, order: 1 },
-    { id: "AA-02", name: "Core Exam Score Bands", resultSet: "MT", gradePattern: "Score bands (10-point)", aspectPattern: "Core Subjects", years: null, order: 2 },
-    { id: "AA-03", name: "Baseline Check Point", resultSet: "BL", gradePattern: "Score bands (10-point)", aspectPattern: "Core Subjects", years: null, order: 3 },
-    { id: "AA-04", name: "Primary Reading Levels", resultSet: "MT", gradePattern: "Reading levels", aspectPattern: "Reading", years: range(3, 6), order: 4 },
+    {
+        id: "AA-01",
+        name: "Core Attainment Analysis",
+        resultSet: "MT",
+        gradePattern: "Attainment bands",
+        aspectPattern: "Core Subjects",
+        years: null,
+        order: 1,
+    },
+    {
+        id: "AA-02",
+        name: "Core Exam Score Bands",
+        resultSet: "MT",
+        gradePattern: "Score bands (10-point)",
+        aspectPattern: "Core Subjects",
+        years: null,
+        order: 2,
+    },
+    {
+        id: "AA-03",
+        name: "Baseline Check Point",
+        resultSet: "BL",
+        gradePattern: "Score bands (10-point)",
+        aspectPattern: "Core Subjects",
+        years: null,
+        order: 3,
+    },
+    {
+        id: "AA-04",
+        name: "Primary Reading Levels",
+        resultSet: "MT",
+        gradePattern: "Reading levels",
+        aspectPattern: "Reading",
+        years: range(3, 6),
+        order: 4,
+    },
     {
         id: "AA-05",
         name: "Secondary Grade Analysis (9–1)",
@@ -122,7 +152,15 @@ export const ASPECT_ANALYSES: AspectAnalysis[] = [
         years: range(7, 11),
         order: 5,
     },
-    { id: "AA-06", name: "Prior-year Baseline", resultSet: "PY", gradePattern: "Attainment bands", aspectPattern: "Core Subjects", years: null, order: 6 },
+    {
+        id: "AA-06",
+        name: "Prior-year Baseline",
+        resultSet: "PY",
+        gradePattern: "Attainment bands",
+        aspectPattern: "Core Subjects",
+        years: null,
+        order: 6,
+    },
 ]
 
 export const ASPECT_SEED = 20261014
@@ -158,7 +196,8 @@ export function generateAssessments(students: Student[]): AssessmentValue[] {
                     return out.push({ ...base, raw: asp.type === "numeric" ? "105" : "Absent", value: null, status: "invalid" })
                 const score = Math.max(0, Math.min(100, Math.round(ability + flair[ai] + drift + between(-8, 8))))
                 if (asp.type === "numeric") out.push({ ...base, raw: String(score), value: score, status: "valid" })
-                else if (asp.type === "grade") out.push({ ...base, raw: READING[Math.min(3, Math.floor(score / 25))], value: null, status: "valid" })
+                else if (asp.type === "grade")
+                    out.push({ ...base, raw: READING[Math.min(3, Math.floor(score / 25))], value: null, status: "valid" })
                 else out.push({ ...base, raw: pick(COMMENTS), value: null, status: "valid" })
             })
         }

@@ -1,7 +1,7 @@
 import { NW, weekRange, WEEKS } from "@/lib/calendar"
 import { ratio, sum } from "@/lib/format"
 import { statusOf, type Tone } from "@/lib/status"
-import { BTYPES, CAT, CODES, LOCS, schoolOf, SPW, YGS, ygShort } from "./data/constants"
+import { BTYPES, CAT, CODES, schoolOf, secName, SPW, YGS, ygShort } from "./data/constants"
 import type { EduDataset, Section, Student } from "./data/types"
 
 export interface StudentMetrics {
@@ -24,7 +24,11 @@ export interface StudentMetrics {
     ratio: number
 }
 
-/** Same rules as the mockup: attendance = (present + late) / sessions; At risk if att < 90 or net ≤ −10. */
+/**
+ * Attendance = (present + late) / sessions that count: sessions marked "attendance not required" or
+ * not marked at all are left out. At risk if att < 90 or net ≤ −10; a student without any counted
+ * session is judged on behaviour alone.
+ */
 export function metricsFor(st: Student, w0 = 0): StudentMetrics {
     let p = 0,
         l = 0,
@@ -36,8 +40,9 @@ export function metricsFor(st: Student, w0 = 0): StudentMetrics {
         pmA = 0
     for (let w = w0; w < NW; w++)
         for (let k = 0; k < SPW; k++) {
-            const c = CAT[st.s[w * SPW + k]]
+            const c = CAT[st.s[w * SPW + k]] ?? "none"
             const am = k % 2 === 0
+            if (c === "none") continue
             if (c === "present") p++
             else if (c === "late") {
                 l++
@@ -65,9 +70,9 @@ export function metricsFor(st: Student, w0 = 0): StudentMetrics {
         }
     }
     const tot = p + l + a + u
-    const att = ((p + l) / tot) * 100
+    const att = tot ? ((p + l) / tot) * 100 : 100
     const net = ach - inc
-    const status: Tone = att < 90 || net <= -10 ? "bad" : att < 95 || net < 0 ? "warn" : "good"
+    const status: Tone = (tot && att < 90) || net <= -10 ? "bad" : (tot && att < 95) || net < 0 ? "warn" : "good"
     return {
         p,
         l,
@@ -95,7 +100,7 @@ export interface EduFilters {
     yg: string
     sec: string
     gender: string
-    w0: 0 | 3 | 5
+    w0: number
 }
 export const DEFAULT_EDU_FILTERS: EduFilters = { school: "all", stage: "all", yg: "all", sec: "all", gender: "all", w0: 0 }
 
@@ -114,7 +119,8 @@ export function analyseEdu(data: EduDataset, f: EduFilters) {
         .map((st) => ({ ...st, m: metricsFor(st, f.w0) }))
     const n = list.length
     const secsIn = data.sections.filter((x) => inScope(x, f))
-    const cap = sum(secsIn.map((x) => x.cap))
+    // capacity only counts sections whose source records it
+    const cap = sum(secsIn.map((x) => x.cap ?? 0))
 
     let P = 0,
         L = 0,
@@ -145,7 +151,7 @@ export function analyseEdu(data: EduDataset, f: EduFilters) {
         achN += m.achN
         incN += m.incN
         if (m.incN) withInc++
-        if (m.att < 90) persist++
+        if (m.tot && m.att < 90) persist++
         if (m.status === "bad") atRisk++
     }
     const TOT = P + L + A + U
@@ -154,7 +160,9 @@ export function analyseEdu(data: EduDataset, f: EduFilters) {
     const female = n - male
 
     // year groups
-    const ygPresent = YGS.map((y) => y[0]).filter((y) => list.some((s) => s.yg === y))
+    const ygPresent = [...YGS.map((y) => y[0]), ...new Set(list.map((s) => s.yg).filter((y) => !YGS.some(([c]) => c === y)))].filter((y) =>
+        list.some((s) => s.yg === y),
+    )
     const byYG: Record<string, { M: number; F: number; list: ScoredStudent[] }> = Object.fromEntries(
         ygPresent.map((y) => [y, { M: 0, F: 0, list: [] as ScoredStudent[] }]),
     )
@@ -164,7 +172,7 @@ export function analyseEdu(data: EduDataset, f: EduFilters) {
     }
     const enrolledByKey: Record<string, number> = {}
     for (const st of list) enrolledByKey[st.key] = (enrolledByKey[st.key] || 0) + 1
-    const fullSecs = secsIn.filter((x) => (enrolledByKey[x.key] || 0) >= x.cap).length
+    const fullSecs = secsIn.filter((x) => x.cap !== null && (enrolledByKey[x.key] || 0) >= x.cap).length
 
     // weekly + heatmap
     const wk = Array.from({ length: NW }, () => [0, 0, 0, 0]) // present, late, absent, total
@@ -174,22 +182,27 @@ export function analyseEdu(data: EduDataset, f: EduFilters) {
         for (let w = f.w0; w < NW; w++)
             for (let k = 0; k < SPW; k++) {
                 const code = st.s[w * SPW + k]
-                const c = CAT[code]
+                const c = CAT[code] ?? "none"
+                codeCount[code]++
+                if (c === "none") continue
                 const ok = c === "present" || c === "late" ? 1 : 0
                 wk[w][c === "present" ? 0 : c === "late" ? 1 : 2]++
                 wk[w][3]++
                 hm[w][k >> 1][0] += ok
                 hm[w][k >> 1][1]++
-                codeCount[code]++
             }
+    // A week (or day) where under 5% of the possible sessions count is a closure (holiday, a
+    // few stray marks): null, so charts leave a gap instead of a misleading figure.
+    const minWeek = Math.max(1, 0.05 * n * SPW)
+    const minDay = Math.max(1, 0.05 * n * 2)
     const weeks = weekRange(f.w0).map((w) => ({
         w,
         label: WEEKS[w],
-        att: wk[w][3] ? ((wk[w][0] + wk[w][1]) / wk[w][3]) * 100 : 0,
+        att: wk[w][3] >= minWeek ? ((wk[w][0] + wk[w][1]) / wk[w][3]) * 100 : null,
         late: ratio(wk[w][1], wk[w][3]),
         abs: ratio(wk[w][2], wk[w][3]),
     }))
-    const heat = weekRange(f.w0).map((w) => hm[w].map(([ok, t]) => (t ? (ok / t) * 100 : 0)))
+    const heat = weekRange(f.w0).map((w) => hm[w].map(([ok, t]) => (t >= minDay ? (ok / t) * 100 : null)))
 
     // behaviour
     const bw = Array.from({ length: NW }, () => [0, 0])
@@ -207,10 +220,13 @@ export function analyseEdu(data: EduDataset, f: EduFilters) {
         }
 
     const bands = [0, 0, 0, 0]
-    for (const st of list) bands[st.m.att >= 97 ? 0 : st.m.att >= 95 ? 1 : st.m.att >= 90 ? 2 : 3]++
+    for (const st of list) if (st.m.tot) bands[st.m.att >= 97 ? 0 : st.m.att >= 95 ? 1 : st.m.att >= 90 ? 2 : 3]++
 
     const nat: Record<string, number> = {}
-    for (const st of list) nat[st.nat] = (nat[st.nat] || 0) + 1
+    for (const st of list) {
+        const key = st.nat || "Not recorded"
+        nat[key] = (nat[key] || 0) + 1
+    }
 
     const half = TOT / 2 || 1
     return {
@@ -253,7 +269,10 @@ export function analyseEdu(data: EduDataset, f: EduFilters) {
         types: BTYPES.map((t, i) => ({ name: t.n, v: tp[i] }))
             .filter((x) => x.v !== 0)
             .sort((a, b) => b.v - a.v),
-        locations: LOCS.map(([name]) => ({ name, v: loc[name] || 0 })),
+        locations: Object.entries(loc)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6)
+            .map(([name, v]) => ({ name, v })),
         nationalities: Object.entries(nat)
             .sort((a, b) => b[1] - a[1])
             .slice(0, 7)
@@ -283,27 +302,32 @@ export function sectionAverageWeeks(data: EduDataset, key: string, w0: number) {
             t = 0
         for (const st of peers)
             for (let k = 0; k < SPW; k++) {
-                const c = CAT[st.s[w * SPW + k]]
+                const c = CAT[st.s[w * SPW + k]] ?? "none"
+                if (c === "none") continue
                 if (c === "present" || c === "late") ok++
                 t++
             }
-        return t ? (ok / t) * 100 : 0
+        return t ? (ok / t) * 100 : null
     })
 }
 
+/** Weekly attendance for one student; null for a week without counted sessions (holidays). */
 export function studentWeeks(st: Student, w0: number) {
     return weekRange(w0).map((w) => {
-        let ok = 0
+        let ok = 0,
+            t = 0
         for (let k = 0; k < SPW; k++) {
-            const c = CAT[st.s[w * SPW + k]]
+            const c = CAT[st.s[w * SPW + k]] ?? "none"
+            if (c === "none") continue
             if (c === "present" || c === "late") ok++
+            t++
         }
-        return (ok / SPW) * 100
+        return t ? (ok / t) * 100 : null
     })
 }
 
 /** Class outcome summary for a set of sections; used by HR Teacher Impact. */
-export function sectionOutcomes(data: EduDataset, keys: string[], w0 = 0) {
+export function sectionOutcomes(data: Pick<EduDataset, "students">, keys: string[], w0 = 0) {
     const set = new Set(keys)
     const studs = data.students.filter((s) => set.has(s.key))
     const ms = studs.map((s) => metricsFor(s, w0))
@@ -318,6 +342,6 @@ export function sectionOutcomes(data: EduDataset, keys: string[], w0 = 0) {
 }
 
 export const sectionLabel = (x: Pick<Section, "school" | "yg" | "sec">, withSchool = false) => {
-    const name = /^\d+$/.test(x.yg) ? `${+x.yg}${x.sec}` : `${x.yg}-${x.sec}`
+    const name = secName(x.yg, x.sec)
     return withSchool ? `${schoolOf(x.school).short} ${name}` : name
 }

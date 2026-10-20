@@ -1,14 +1,12 @@
-import { DATA_SOURCE } from "@/lib/data-source"
-import { finApiSource } from "./api"
-import { finMockSource } from "./mock"
+import { fetchInsights, metaOf } from "@/lib/insights"
 import type { FinDataset } from "./types"
 
 /**
- * Contract between the CIS screens and the Finance platform. Screens only go through hooks that call
- * this interface, so swapping mock data for the real ISSPHERE endpoints is a one-line change.
+ * Loads the Finance dashboards' data from the CIS API. Until a Finance source is connected and
+ * synced, the API reports the platform as not connected and the screens say so.
  */
-export interface FinDataSource {
-    load(): Promise<FinDataset>
+export async function loadFin(): Promise<FinDataset> {
+    const payload = await fetchInsights<Partial<FinDataset>>("fin")
+    const empty = { accounts: [], payroll: [], budget: [], income: [], openingCash: 0 }
+    return { ...empty, ...(payload.connected ? payload : {}), meta: metaOf(payload) }
 }
-
-export const finSource: FinDataSource = DATA_SOURCE === "api" ? finApiSource : finMockSource

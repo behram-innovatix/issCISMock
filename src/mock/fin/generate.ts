@@ -1,8 +1,6 @@
-import { AS_OF } from "@/lib/data-source"
+import { AS_OF } from "@/lib/calendar"
 import { sum } from "@/lib/format"
-import { makeRandom } from "@/lib/seed"
 import { metricsFor } from "@/platforms/edu/analytics"
-import type { EduDataset } from "@/platforms/edu/data/types"
 import { LOCATIONS } from "@/platforms/hr/data/constants"
 import type { Employee } from "@/platforms/hr/data/types"
 import {
@@ -22,8 +20,19 @@ import {
     TERMS,
     TRANSPORT_FEE,
     TUITION,
-} from "./constants"
-import type { BudgetLine, FeeAccount, FinDataset, IncomeLine, Instalment, Invoice, Payment, PayrollRecord } from "./types"
+} from "@/platforms/fin/data/constants"
+import type {
+    BudgetLine,
+    FeeAccount,
+    FinDataset,
+    IncomeLine,
+    Instalment,
+    Invoice,
+    Payment,
+    PayrollRecord,
+} from "@/platforms/fin/data/types"
+import type { MockEdu } from "../edu/generate"
+import { makeRandom } from "../seed"
 
 export const FIN_SEED = 20261018
 
@@ -43,7 +52,7 @@ const ACTIVITY_PHASING = [0.8, 1, 1.6, 1.2, 0.9, 0.4, 0, 0.2, 0.7, 1.1, 1.6, 1.5
  *  - payroll comes from each HR employee's grade, joining date and unpaid leave
  *  - salaries actuals in the budget are the payroll; other categories are phased with realistic variance
  */
-export function generateFin(edu: EduDataset, employees: Employee[]): FinDataset {
+export function generateFin(edu: MockEdu, employees: Employee[]): Omit<FinDataset, "meta"> {
     const { R, between, weighted } = makeRandom(FIN_SEED)
     const method = () =>
         weighted<PaymentMethod>([

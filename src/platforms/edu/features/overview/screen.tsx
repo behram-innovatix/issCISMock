@@ -35,12 +35,16 @@ export function EduOverviewScreen() {
                                 label="Capacity used"
                                 icon={<Armchair />}
                                 color="var(--c2)"
-                                value={pct(a.util, 0)}
+                                value={a.cap ? pct(a.util, 0) : "—"}
                                 foot={
-                                    <>
-                                        <Meter value={a.util} color="var(--c2)" className="flex-1" />
-                                        <span>{fmt(a.cap)} seats</span>
-                                    </>
+                                    a.cap ? (
+                                        <>
+                                            <Meter value={a.util} color="var(--c2)" className="flex-1" />
+                                            <span>{fmt(a.cap)} seats</span>
+                                        </>
+                                    ) : (
+                                        <span>Capacity not recorded · {fmt(a.secsIn.length)} sections</span>
+                                    )
                                 }
                             />
                             <Kpi
