@@ -2,17 +2,25 @@
 
 An executive dashboard that brings performance data from every Issphere platform into one place. It is built for the CEO first and can be opened to other leaders later. It covers **EDU** (students) and **ERP**: **HR** (staff) and **Finance** (fees, budget, payroll and cash flow, in QAR). New platforms plug in through a registry.
 
-All data comes from the **CIS API** ([`Herd/issCisApi`](../../../Herd/issCisApi), Laravel + MySQL). It pulls each connected source (issEduApi's database, ISS export APIs, REST APIs, spreadsheets, pushed records) into its own store on a schedule and serves the dashboards from there. Administrators manage those sources under **Administration → Connections**. A platform without synced data shows a "not connected" state instead of its dashboards.
+In **API mode** all data comes from the **CIS API** ([`Herd/issCisApi`](../../../Herd/issCisApi), Laravel + MySQL). It pulls each connected source (issEduApi's database, ISS export APIs, REST APIs, spreadsheets, pushed records) into its own store on a schedule and serves the dashboards from there. Administrators manage those sources under **Administration → Connections**. A platform without synced data shows a "not connected" state instead of its dashboards.
+
+In **mock mode** (the default, and what the Vercel preview of `main` runs) there is no backend: every dashboard, Aspect Analysis and the Connections screens run on data generated in the browser, in the same shape the CIS API returns. Changes made under Connections are kept in that browser only.
 
 ## Run it
 
 ```bash
 npm install
-cp .env.example .env.local   # then set CIS_API_TOKEN (php artisan cis:token in issCisApi)
-npm run dev                  # http://localhost:3010
+npm run dev                  # http://localhost:3010, mock mode
 ```
 
-The CIS API must be running (Herd serves it at http://isscisapi.test) with a queue worker for syncs: `php artisan queue:work` and `php artisan schedule:work` in issCisApi.
+To run against the CIS API instead:
+
+```bash
+cp .env.example .env.local   # set NEXT_PUBLIC_DATA_SOURCE=api and CIS_API_TOKEN (php artisan cis:token in issCisApi)
+npm run dev
+```
+
+The CIS API must then be running (Herd serves it at http://isscisapi.test) with a queue worker for syncs: `php artisan queue:work` and `php artisan schedule:work` in issCisApi.
 
 | Script              | What it does                         |
 | ------------------- | ------------------------------------ |
@@ -32,8 +40,7 @@ The stack matches ISSPHERE-UI: Next.js 16 (App Router), React 19, Tailwind v4, r
 | EDU Overview | `/edu` | Students, capacity, attendance, lateness, persistent absence, net behaviour |
 | EDU Enrollment | `/edu/enrollment` | Year-group bars (click to drill down), gender, section capacity grid, nationality |
 | EDU Attendance | `/edu/attendance` | Session mix, year groups, attendance bands, day-of-week heatmap, AM vs PM, mark codes |
-| EDU Aspect Analysis | `/edu/aspects` | Assessment results by aspect (waits for an assessment stream to be connected) |
-| EDU Aspect Analysis | `/edu/aspects` | Assessment results by aspect (waits for an assessment stream to be connected) |
+| EDU Aspect Analysis | `/edu/aspects` | Assessment results by grade band per saved analysis, drilling from the group to students (mock mode; in API mode it waits for an assessment stream) |
 | EDU Behaviour | `/edu/behaviour` | Attendance × behaviour matrix (click a box to list the students), leaderboards, behaviour types |
 | EDU Students | `/edu/students`, `/edu/students/[id]` | Sortable register; profile with an AM/PM calendar, comparison with the class, and a behaviour log linked to staff |
 | HR Overview | `/hr` | Staff attendance, absence, leave, average appraisal, cycle progress, by location and department |
@@ -48,7 +55,6 @@ The stack matches ISSPHERE-UI: Next.js 16 (App Router), React 19, Tailwind v4, r
 | Finance Cash Flow | `/fin/cash-flow` | Inflow vs outflow, cash position, income by stream, expenditure by category, days of cash on hand |
 | Finance Fee Accounts | `/fin/accounts`, `/fin/accounts/[id]` | Register by status; statement with invoices, instalments, payments and a link to the EDU student |
 | Connections | `/admin/connections` | Administrators: the data sources behind every dashboard — add (catalog of connector types), test, sync, history, files, push endpoint |
-| Connections | `/admin/connections` | Administrators: the data sources behind every dashboard — add (catalog of connector types), test, sync, history, files, push endpoint |
 
 Filters (school, stage, year group, section, gender, period on EDU; location, department, role, period on HR; location, stage, period on Finance) apply to every screen in that platform.
 
@@ -60,19 +66,21 @@ app/api/insights/[platform]    server proxy: dashboard datasets from the CIS API
 app/api/admin/connections/…    server proxy: connection management for administrators
 src/platforms/registry.ts      every platform and how the sidebar groups them (EDU, ERP)
 src/platforms/<code>/
-  data/source.ts               loads the platform's dataset from the CIS API  ← the integration contract
+  data/source.ts               loads the platform's dataset (CIS API, or mock)  ← the integration contract
   data/constants.ts            CIS vocabularies; reference data (schools, mark codes…) arrives with the dataset
   analytics.ts                 pure roll-ups the screens render (unit-testable, server-portable)
   state.ts, hooks.ts           zustand filters, TanStack Query hooks
   components/, features/*/screen.tsx
 src/lib/calendar.ts            the reporting calendar, applied from the dataset (live bindings)
 src/features/connections/      the Connections admin screens (forms generated from each connector's fields)
+src/lib/data-source.ts         NEXT_PUBLIC_DATA_SOURCE: "mock" (default) or "api"
+src/mock/                      mock mode: generators (edu, hr, fin), the world, insights payloads, Connections backend
 src/components/{shell,ui,charts,insights}   shared layout, primitives, chart presets, KPI/matrix/calendar/table
 ```
 
 ### Where the data comes from
 
-Each `data/source.ts` fetches `/api/insights/<platform>`, which the CIS API builds from the synced marts of that platform's data sources. The EDU dataset brings its own reporting calendar (the school weeks up to the latest attendance mark) and reference data (schools, register mark codes and how they count, behaviour types, staff). HR and Finance report "not connected" until their sources (the seeded HRM and Finance API connections) are set up and their dataset builders exist in the CIS API.
+Each `data/source.ts` fetches `/api/insights/<platform>` (in mock mode, `src/mock/insights.ts` returns the same payload from generated data), which the CIS API builds from the synced marts of that platform's data sources. The EDU dataset brings its own reporting calendar (the school weeks up to the latest attendance mark) and reference data (schools, register mark codes and how they count, behaviour types, staff). HR and Finance report "not connected" until their sources (the seeded HRM and Finance API connections) are set up and their dataset builders exist in the CIS API.
 
 ### Adding a platform
 

@@ -327,7 +327,7 @@ export function studentWeeks(st: Student, w0: number) {
 }
 
 /** Class outcome summary for a set of sections; used by HR Teacher Impact. */
-export function sectionOutcomes(data: EduDataset, keys: string[], w0 = 0) {
+export function sectionOutcomes(data: Pick<EduDataset, "students">, keys: string[], w0 = 0) {
     const set = new Set(keys)
     const studs = data.students.filter((s) => set.has(s.key))
     const ms = studs.map((s) => metricsFor(s, w0))

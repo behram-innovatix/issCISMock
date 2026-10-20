@@ -1,5 +1,6 @@
 "use client"
 
+import { DATA_SOURCE } from "@/lib/data-source"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 /* Shapes returned by the CIS API (issCisApi /api/v1/admin), through app/api/admin/connections. */
@@ -138,6 +139,9 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
+    // the preview has no CIS API: the demo connections are answered in the browser
+    if (DATA_SOURCE === "mock") return (await import("@/mock/connections")).mockRequest<T>(path, init)
+
     const form = init?.body instanceof FormData
     const res = await fetch(`/api/admin/connections/${path}`, {
         method: init?.method ?? "GET",

@@ -1,3 +1,5 @@
+import { DATA_SOURCE } from "@/lib/data-source"
+
 /** Freshness and connection state that comes with every platform dataset from the CIS API. */
 export interface InsightsMeta {
     platform: string
@@ -18,8 +20,13 @@ export class InsightsError extends Error {
     }
 }
 
-/** A platform's dashboard dataset, through the CIS web app's server proxy (app/api/insights). */
+/**
+ * A platform's dashboard dataset, through the CIS web app's server proxy (app/api/insights), or
+ * generated in the browser in mock mode.
+ */
 export async function fetchInsights<T>(platform: string): Promise<T & InsightsMeta> {
+    if (DATA_SOURCE === "mock") return (await import("@/mock/insights")).mockInsights<T>(platform)
+
     const res = await fetch(`/api/insights/${platform}`)
     const json = await res.json().catch(() => ({}))
     if (!res.ok) throw new InsightsError(json.message ?? `Couldn’t load ${platform} data (${res.status})`, res.status)

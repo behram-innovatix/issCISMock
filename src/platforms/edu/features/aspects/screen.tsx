@@ -2,13 +2,17 @@
 
 import { PageHeader } from "@/components/shell/page-header"
 import { Panel } from "@/components/ui/panel"
+import { DATA_SOURCE } from "@/lib/data-source"
 import { ChartColumn } from "lucide-react"
+import { EduAspectAnalysis } from "./analysis"
 
 /**
  * Aspect Analysis reads assessment results (grades per aspect and result set). Assessments aren't a
- * canonical CIS stream yet, so until one is added and connected the screen says so.
+ * canonical CIS stream yet, so until one is added and connected the screen says so. The mock
+ * data generates assessment results, so the preview shows the full analysis.
  */
 export function EduAspectsScreen() {
+    if (DATA_SOURCE === "mock") return <EduAspectAnalysis />
     return (
         <>
             <PageHeader
